@@ -16,7 +16,10 @@ type PaneCategory = {
 const paneCategories: PaneCategory[] = [
   {
     label: 'Introspection',
-    items: [{ label: 'Diary', to: '/introspection/diary' }],
+    items: [
+      { label: 'Diary', to: '/introspection/diary' },
+      { label: 'Day Log', to: '/introspection/day-log' },
+    ],
   },
 ]
 

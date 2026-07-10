@@ -1,9 +1,12 @@
 import { supabase } from './supabase'
 
+export type DayLog = Record<string, string>
+
 export type DiaryEntry = {
   id: string
   date: string
   general_content: string | null
+  day_log: DayLog | null
   created_at: string
   updated_at: string
   user_id: string
@@ -34,6 +37,29 @@ export async function saveEntry(params: {
     .from('diary')
     .upsert(
       { date, general_content: generalContent, user_id: userId },
+      { onConflict: 'user_id,date' },
+    )
+    .select('*')
+    .single()
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+export async function saveDayLog(params: {
+  date: string
+  dayLog: DayLog
+  userId: string
+}): Promise<DiaryEntry> {
+  const { date, dayLog, userId } = params
+
+  const { data, error } = await supabase
+    .from('diary')
+    .upsert(
+      { date, day_log: dayLog, user_id: userId },
       { onConflict: 'user_id,date' },
     )
     .select('*')

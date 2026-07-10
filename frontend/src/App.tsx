@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { ProtectedRoute, PublicRoute } from './components/ProtectedRoute'
+import { DayLogPage } from './pages/DayLogPage'
 import { DiaryPage } from './pages/DiaryPage'
 import { LoginPage } from './pages/LoginPage'
 
@@ -14,6 +15,7 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<Layout />}>
             <Route path="/introspection/diary" element={<DiaryPage />} />
+            <Route path="/introspection/day-log" element={<DayLogPage />} />
             <Route path="/" element={<Navigate to="/introspection/diary" replace />} />
           </Route>
         </Route>

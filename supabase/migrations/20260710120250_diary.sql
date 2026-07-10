@@ -2,6 +2,7 @@ create table public.diary (
   id uuid primary key default gen_random_uuid(),
   "date" date not null,
   general_content text,
+  day_log jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   user_id uuid not null references auth.users (id) on delete cascade,
