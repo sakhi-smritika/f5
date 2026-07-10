@@ -14,10 +14,29 @@ from fastapi.responses import JSONResponse
 from api.v1.router import router as v1_router
 from config.logger import setup_logging
 from config.middleware import RequestLoggingMiddleware
+from config.pings import check_supabase_connection, check_supabase_service_key, check_openai_api_key, check_gemini_api_key
+
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_PUBLISHABLE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY")
+SUPABASE_SECRET_KEY = os.getenv("SUPABASE_SECRET_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+
+def _run_startup_checks() -> None:
+    if SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY:
+        check_supabase_connection(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY)
+    if SUPABASE_URL and SUPABASE_SECRET_KEY:
+        check_supabase_service_key(SUPABASE_URL, SUPABASE_SECRET_KEY)
+    if OPENAI_API_KEY:
+        check_openai_api_key(OPENAI_API_KEY)
+    if GEMINI_API_KEY:
+        check_gemini_api_key(GEMINI_API_KEY)
 
 
 @asynccontextmanager
@@ -32,6 +51,7 @@ def create_app() -> FastAPI:
     The function to create the FastAPI application instance. To be used by main.py
     """
     setup_logging()
+    _run_startup_checks()
 
     app = FastAPI(title="My Sakhismritika Application", lifespan=lifespan)
     environment = os.getenv("ENVIRONMENT", "local") 
