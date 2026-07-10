@@ -47,7 +47,7 @@ def create_app() -> FastAPI:
     else:
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=["https://sakhismritika.space"],
+            allow_origins=["https://sakhismritika.space", "https://www.sakhismritika.space"],
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
