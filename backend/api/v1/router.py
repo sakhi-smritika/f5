@@ -1,20 +1,24 @@
 import logging
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
+
+from config.auth import AuthenticatedUser, get_current_user
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/v1",
+    dependencies=[Depends(get_current_user)],
 )
 
 
 @router.get("/hello")
-def hello(_: Request) -> dict:
+def hello(request: Request, user: AuthenticatedUser = Depends(get_current_user)) -> dict:
     """
     A sample hello endpoint.
     """
-    logger.info("Hello endpoint called")
+    logger.info("Hello endpoint called", extra={"user_id": user.id})
     return {
-        "message": "hello"
+        "message": "hello",
+        "user_id": user.id,
     }

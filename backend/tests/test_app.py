@@ -3,7 +3,7 @@ from fastapi import FastAPI
 
 def test_create_app_returns_fastapi_instance(app):
     assert isinstance(app, FastAPI)
-    assert app.title == "My FastAPI Application"
+    assert app.title == "My Sakhismritika Application"
 
 
 def test_health_endpoint(client):
@@ -17,7 +17,14 @@ def test_hello_endpoint(client):
     response = client.get("/api/v1/hello")
 
     assert response.status_code == 200
-    assert response.json() == {"message": "hello"}
+    assert response.json() == {"message": "hello", "user_id": "test-user-id"}
+
+
+def test_hello_endpoint_requires_auth(unauthenticated_client):
+    response = unauthenticated_client.get("/api/v1/hello")
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Not authenticated"}
 
 
 def test_unhandled_exception_returns_500(app):

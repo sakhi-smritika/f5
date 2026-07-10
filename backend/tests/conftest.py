@@ -3,6 +3,7 @@ import logging
 import pytest
 
 import config.logger as logger_module
+from config.auth import AuthenticatedUser, get_current_user
 
 
 @pytest.fixture
@@ -21,10 +22,22 @@ def reset_logging(monkeypatch, tmp_path):
 
 
 @pytest.fixture
-def app(reset_logging):
+def authenticated_user():
+    return AuthenticatedUser(
+        id="test-user-id",
+        email="test@example.com",
+        raw={"id": "test-user-id", "email": "test@example.com"},
+    )
+
+
+@pytest.fixture
+def app(reset_logging, authenticated_user):
     from app import create_app
 
-    return create_app()
+    application = create_app()
+    application.dependency_overrides[get_current_user] = lambda: authenticated_user
+    yield application
+    application.dependency_overrides.clear()
 
 
 @pytest.fixture
@@ -32,4 +45,14 @@ def client(app):
     from fastapi.testclient import TestClient
 
     with TestClient(app, raise_server_exceptions=False) as test_client:
+        yield test_client
+
+
+@pytest.fixture
+def unauthenticated_client(reset_logging):
+    from app import create_app
+    from fastapi.testclient import TestClient
+
+    application = create_app()
+    with TestClient(application, raise_server_exceptions=False) as test_client:
         yield test_client
