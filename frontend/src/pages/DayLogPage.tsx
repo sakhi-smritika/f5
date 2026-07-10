@@ -9,6 +9,13 @@ function todayIsoDate(): string {
   return new Date(now.getTime() - offsetMs).toISOString().slice(0, 10)
 }
 
+function addDays(isoDate: string, delta: number): string {
+  const [year, month, day] = isoDate.split('-').map(Number)
+  const shifted = new Date(year, month - 1, day + delta)
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${shifted.getFullYear()}-${pad(shifted.getMonth() + 1)}-${pad(shifted.getDate())}`
+}
+
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour)
 
 function emptyDayLog(): DayLog {
@@ -109,12 +116,31 @@ export function DayLogPage() {
         <h1 className="daylog-title">Day Log</h1>
         <label className="daylog-date">
           <span>Date</span>
-          <input
-            type="date"
-            value={date}
-            max={todayIsoDate()}
-            onChange={(event) => setDate(event.target.value)}
-          />
+          <div className="daylog-date-controls">
+            <button
+              type="button"
+              className="daylog-date-nav"
+              aria-label="Previous day"
+              onClick={() => setDate((current) => addDays(current, -1))}
+            >
+              &lt;
+            </button>
+            <input
+              type="date"
+              value={date}
+              max={todayIsoDate()}
+              onChange={(event) => setDate(event.target.value)}
+            />
+            <button
+              type="button"
+              className="daylog-date-nav"
+              aria-label="Next day"
+              disabled={date >= todayIsoDate()}
+              onClick={() => setDate((current) => addDays(current, 1))}
+            >
+              &gt;
+            </button>
+          </div>
         </label>
       </div>
 

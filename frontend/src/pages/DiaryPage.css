@@ -31,6 +31,12 @@
   color: var(--text);
 }
 
+.diary-date-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .diary-date input {
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--border);
@@ -40,6 +46,30 @@
   font: inherit;
   font-size: 16px;
   color-scheme: light dark;
+}
+
+.diary-date-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2.25rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--text-h);
+  cursor: pointer;
+  font: inherit;
+  font-size: 16px;
+}
+
+.diary-date-nav:hover:not(:disabled) {
+  border-color: var(--accent-border);
+}
+
+.diary-date-nav:disabled {
+  cursor: default;
+  opacity: 0.4;
 }
 
 .diary-hint {

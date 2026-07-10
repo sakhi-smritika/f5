@@ -9,6 +9,13 @@ function todayIsoDate(): string {
   return new Date(now.getTime() - offsetMs).toISOString().slice(0, 10)
 }
 
+function addDays(isoDate: string, delta: number): string {
+  const [year, month, day] = isoDate.split('-').map(Number)
+  const shifted = new Date(year, month - 1, day + delta)
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${shifted.getFullYear()}-${pad(shifted.getMonth() + 1)}-${pad(shifted.getDate())}`
+}
+
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 
 export function DiaryPage() {
@@ -89,12 +96,31 @@ export function DiaryPage() {
         <h1 className="diary-title">Diary</h1>
         <label className="diary-date">
           <span>Date</span>
-          <input
-            type="date"
-            value={date}
-            max={todayIsoDate()}
-            onChange={(event) => setDate(event.target.value)}
-          />
+          <div className="diary-date-controls">
+            <button
+              type="button"
+              className="diary-date-nav"
+              aria-label="Previous day"
+              onClick={() => setDate((current) => addDays(current, -1))}
+            >
+              &lt;
+            </button>
+            <input
+              type="date"
+              value={date}
+              max={todayIsoDate()}
+              onChange={(event) => setDate(event.target.value)}
+            />
+            <button
+              type="button"
+              className="diary-date-nav"
+              aria-label="Next day"
+              disabled={date >= todayIsoDate()}
+              onClick={() => setDate((current) => addDays(current, 1))}
+            >
+              &gt;
+            </button>
+          </div>
         </label>
       </div>
 
