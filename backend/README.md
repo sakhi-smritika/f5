@@ -4,9 +4,11 @@ FastAPI service for the personal-growth app. It handles logic that shouldn't run
 
 ## Stack
 
+- **Python 3.11.14**
 - **FastAPI** + **uvicorn**
 - **supabase** (Python client) for verifying bearer tokens
 - **python-json-logger** for structured logging
+- **google-adk** (`[db]` extra) + **litellm** for the chatbot agent; **asyncpg** for ADK session persistence
 - **pytest** for tests
 
 ## Getting started
@@ -33,7 +35,10 @@ Copy `.env.example` to `.env`:
 | `CORS_ORIGINS` | Comma-separated allowed origins (local only) |
 | `SUPABASE_URL` | Supabase project URL |
 | `SUPABASE_PUBLISHABLE_KEY` | Supabase publishable (anon) key — used to validate user tokens |
-| `SUPABASE_SECRET_KEY` | Supabase service-role key (for privileged operations) |
+| `SUPABASE_SECRET_KEY` | Supabase service-role key (privileged ops, e.g. `conversations` writes) |
+| `OPENAI_API_KEY` | OpenAI key used by the chat agent (via LiteLLM) |
+| `OPENAI_MODEL` | LiteLLM model string (default `openai/gpt-4o`) |
+| `DATABASE_URL` | Async SQLAlchemy URL for ADK session persistence, e.g. `postgresql+asyncpg://postgres:<pwd>@<host>:5432/postgres` (must use the `asyncpg` driver) |
 | `ENVIRONMENT` | `local` or `production` (controls CORS policy) |
 
 ## Project structure
@@ -43,15 +48,19 @@ main.py                 # Entry point: app = create_app(); runs uvicorn on :8080
 app.py                  # create_app(): CORS, middleware, routers, health + error handlers
 api/
   v1/
-    router.py           # /api/v1 router (all routes require auth); sample GET /hello
+    router.py           # /api/v1 router (all routes require auth); sample GET /hello; mounts chat
+    chat.py             # /api/v1/chat endpoints (conversations, messages, SSE streaming)
+agent/
+  agent.py              # ADK LlmAgent (OpenAI via LiteLlm) + cached DatabaseSessionService & Runner
 config/
-  supabase.py           # get_supabase_client() (cached) from SUPABASE_URL/PUBLISHABLE_KEY
+  supabase.py           # get_supabase_client() + get_supabase_service_client() (service-role)
   auth.py               # get_current_user() dependency + AuthenticatedUser
   middleware.py         # RequestLoggingMiddleware (per-request structured logs)
   logger.py             # setup_logging(): colored console + JSON file logs in logs/
 tests/
   conftest.py           # fixtures: app, client, unauthenticated_client, auth override
   test_app.py           # app creation, /health, /api/v1/hello (+ auth) , 500 handler
+  test_chat.py          # chat endpoints (mocked ADK runner/session service + Supabase)
   test_middleware.py    # request logging middleware
   test_logger.py        # logging setup
 ```
@@ -68,6 +77,19 @@ tests/
 | --- | --- | --- | --- |
 | GET | `/health` | no | Liveness check -> `{"status": "ok"}` |
 | GET | `/api/v1/hello` | yes | Sample endpoint -> `{"message": "hello", "user_id": ...}` |
+| POST | `/api/v1/chat/conversations` | yes | Create a conversation (ADK session + metadata row) -> `{"id", "title"}` |
+| GET | `/api/v1/chat/conversations/{id}/messages` | yes | Load a conversation's history -> `{"messages": [{"role", "text"}]}` |
+| POST | `/api/v1/chat/conversations/{id}/messages` | yes | Send a message; streams the reply as SSE (`data: {"delta"|"done"|"error"}`) |
+| DELETE | `/api/v1/chat/conversations/{id}` | yes | Delete a conversation (ADK session + metadata row) -> `{"ok": true}` |
+
+## Chatbot (ADK)
+
+The chat feature is powered by [Google ADK](https://adk.dev). `agent/agent.py` defines an `LlmAgent` that talks to OpenAI through `LiteLlm`, plus cached singletons for a `DatabaseSessionService` and a `Runner`.
+
+- **Persistence (hybrid):** a conversation is an ADK *session*; its messages are ADK *events*, persisted by `DatabaseSessionService` in the Postgres database pointed at by `DATABASE_URL`. ADK auto-creates its own tables (`sessions`, `events`, `app_states`, `user_states`) on first use. A small `conversations` table (see `supabase/`) stores sidebar metadata (title, timestamps) for the history list.
+- **Isolation:** every session is keyed by the authenticated Supabase `user_id`; ownership of `conversations` rows is checked on each request. Metadata writes use the service-role client (`get_supabase_service_client`).
+- **Streaming:** `POST .../messages` runs the agent with `StreamingMode.SSE` and forwards partial text deltas to the browser as Server-Sent Events, followed by a terminal `{"done": true, "title": ...}` frame.
+- **MCP servers:** add `McpToolset(...)` entries to the agent's `tools` list in `agent/agent.py` to connect Model Context Protocol servers (none are wired up yet).
 
 ## Logging
 

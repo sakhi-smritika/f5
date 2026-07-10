@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { getProfile } from '../lib/profile'
+import { ChatPanel } from './chat/ChatPanel'
 import './Layout.css'
 
 type PaneItem = {
@@ -120,6 +121,8 @@ export function Layout() {
       <main className="layout-content">
         <Outlet />
       </main>
+
+      <ChatPanel />
     </>
   )
 }

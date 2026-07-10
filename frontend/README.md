@@ -7,6 +7,7 @@ React + TypeScript + Vite single-page app. It is the user-facing part of the per
 - **React 19** + **TypeScript**, bundled with **Vite**
 - **react-router-dom** for routing
 - **@supabase/supabase-js** for auth + data
+- **react-markdown** for rendering assistant chat messages
 - ESLint (with the React Compiler lint rules, hence some strict `react-hooks/*` rules)
 
 ## Getting started
@@ -41,7 +42,12 @@ src/
     AuthContext.tsx     # useAuth(): session, user, signIn, signOut (Supabase auth)
   components/
     ProtectedRoute.tsx  # Guards routes; also PublicRoute for the login page
-    Layout.tsx          # Persistent top header + pane-selector nav + <Outlet/>
+    Layout.tsx          # Persistent top header + pane-selector nav + <Outlet/> + <ChatPanel/>
+    chat/
+      ChatPanel.tsx     # Right-side assistant panel (collapsed/half/fullscreen); portal to body
+      ConversationList.tsx  # Sidebar of past chats + "New chat"
+      MessageList.tsx   # Message bubbles (markdown for assistant) + streaming cursor
+      Composer.tsx      # Textarea + send (Enter to send, Shift+Enter for newline)
   pages/
     LoginPage.tsx       # Email/password sign-in
     DiaryPage.tsx       # Introspection > Diary (free-text entry per date)
@@ -52,6 +58,7 @@ src/
     api.ts              # apiFetch(): fetch wrapper that attaches the Supabase bearer token
     diary.ts            # Data access for the `diary` table (diary text + day_log jsonb)
     profile.ts          # Data access for the `users` (profile) table
+    chat.ts             # Chat API: Supabase-direct conversation list + SSE-over-fetch client
 ```
 
 ## Routing
@@ -75,6 +82,18 @@ New panes are added by (1) adding an item to `paneCategories` in `Layout.tsx` an
 Pages call the Supabase client directly through small helpers in `src/lib/`. Row Level Security on the Supabase side scopes every row to the signed-in user, so the client only ever filters by things like `date`. Writes use `upsert(..., { onConflict: 'user_id,date' })` against the `diary` table's unique constraint.
 
 For calls that go through the backend instead, use `apiFetch(path)` from `src/lib/api.ts` — it injects the `Authorization: Bearer <access_token>` header and signs the user out on a `401`.
+
+## Chatbot panel
+
+`ChatPanel` (mounted by `Layout`) is a fixed panel on the right of the viewport with three modes — `collapsed` (thin rail), `half` (default, 50% width), and `fullscreen` — persisted in `localStorage`. It renders via a portal to `document.body` and shrinks `#root` with body classes (`chat-half` / `chat-collapsed` / `chat-full`) so the page content occupies the remaining space.
+
+Data flow (`src/lib/chat.ts`):
+
+- The conversation list is read **directly from Supabase** (`conversations` table, RLS-scoped to the user).
+- Creating, sending, loading messages, and deleting go through the **backend** via `apiFetch`, so the OpenAI key and ADK/MCP connections stay server-side.
+- Sending a message streams the reply with **SSE over `fetch`** (not `EventSource`, which can't send the auth header): the response body is read and `data:` frames are parsed into `delta` / `done` / `error` events for a typewriter effect.
+
+Conversations are created lazily on the first message (so empty threads aren't persisted).
 
 ## Deployment (Vercel)
 

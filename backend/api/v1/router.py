@@ -2,6 +2,7 @@ import logging
 
 from fastapi import APIRouter, Depends, Request
 
+from api.v1.chat import router as chat_router
 from config.auth import AuthenticatedUser, get_current_user
 
 logger = logging.getLogger(__name__)
@@ -10,6 +11,8 @@ router = APIRouter(
     prefix="/api/v1",
     dependencies=[Depends(get_current_user)],
 )
+
+router.include_router(chat_router)
 
 
 @router.get("/hello")
