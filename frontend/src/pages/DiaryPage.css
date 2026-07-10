@@ -1,0 +1,109 @@
+.diary-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.diary-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.diary-title {
+  margin: 0;
+  font-size: 32px;
+}
+
+.diary-date {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.diary-date input {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--bg);
+  color: var(--text-h);
+  font: inherit;
+  font-size: 16px;
+  color-scheme: light dark;
+}
+
+.diary-hint {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.diary-editor {
+  width: 100%;
+  min-height: 320px;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--bg);
+  color: var(--text-h);
+  font: inherit;
+  line-height: 1.5;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.diary-editor:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-color: transparent;
+}
+
+.diary-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.diary-save {
+  padding: 0.5rem 1.25rem;
+  border-radius: 0.5rem;
+  border: 2px solid transparent;
+  background: var(--accent-bg);
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 16px;
+  transition: border-color 0.3s;
+}
+
+.diary-save:hover:not(:disabled) {
+  border-color: var(--accent-border);
+}
+
+.diary-save:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.diary-status {
+  color: var(--text);
+}
+
+.diary-saved {
+  color: var(--accent);
+  font-size: 15px;
+}
+
+.diary-error {
+  color: #dc2626;
+  font-size: 15px;
+}
