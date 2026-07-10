@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { getProfile } from '../lib/profile'
 import './Layout.css'
 
 type PaneItem = {
@@ -26,6 +27,7 @@ const paneCategories: PaneCategory[] = [
 export function Layout() {
   const { user, signOut } = useAuth()
   const [openCategory, setOpenCategory] = useState<string | null>(null)
+  const [displayName, setDisplayName] = useState<string | null>(null)
   const navRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
@@ -38,6 +40,36 @@ export function Layout() {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadProfile() {
+      if (!user?.id) {
+        setDisplayName(null)
+        return
+      }
+
+      try {
+        const profile = await getProfile(user.id)
+        if (!cancelled) {
+          setDisplayName(profile?.display_name ?? null)
+        }
+      } catch {
+        if (!cancelled) {
+          setDisplayName(null)
+        }
+      }
+    }
+
+    void loadProfile()
+
+    return () => {
+      cancelled = true
+    }
+  }, [user?.id])
+
+  const accountLabel = displayName ?? user?.email ?? null
 
   return (
     <>
@@ -78,7 +110,7 @@ export function Layout() {
         </nav>
 
         <div className="layout-account">
-          {user?.email ? <span className="layout-user">{user.email}</span> : null}
+          {accountLabel ? <span className="layout-user">{accountLabel}</span> : null}
           <button type="button" className="sign-out" onClick={() => void signOut()}>
             Sign out
           </button>
