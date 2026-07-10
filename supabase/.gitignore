@@ -3,6 +3,13 @@
 .temp
 
 # dotenvx
-.env.keys
+.env
 .env.local
 .env.*.local
+.env.production
+
+# Virtual environment
+.venv/
+
+# cache files
+*/__pycache__/*
