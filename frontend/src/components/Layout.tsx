@@ -111,7 +111,7 @@ export function Layout() {
         </nav>
 
         <div className="layout-account">
-          {accountLabel ? <span className="layout-user">{accountLabel}</span> : null}
+          {accountLabel ? <span className="layout-user"><b>{accountLabel}</b></span> : null}
           <button type="button" className="sign-out" onClick={() => void signOut()}>
             Sign out
           </button>
