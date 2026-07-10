@@ -14,7 +14,13 @@ from fastapi.responses import JSONResponse
 from api.v1.router import router as v1_router
 from config.logger import setup_logging
 from config.middleware import RequestLoggingMiddleware
-from config.pings import check_supabase_connection, check_supabase_service_key, check_openai_api_key, check_gemini_api_key
+from config.pings import (
+    check_supabase_connection,
+    check_supabase_service_key,
+    check_openai_api_key,
+    check_gemini_api_key,
+    check_database_connection,
+)
 
 
 load_dotenv()
@@ -26,7 +32,7 @@ SUPABASE_PUBLISHABLE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY")
 SUPABASE_SECRET_KEY = os.getenv("SUPABASE_SECRET_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 def _run_startup_checks() -> None:
     if SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY:
@@ -37,7 +43,8 @@ def _run_startup_checks() -> None:
         check_openai_api_key(OPENAI_API_KEY)
     if GEMINI_API_KEY:
         check_gemini_api_key(GEMINI_API_KEY)
-
+    if DATABASE_URL:
+        check_database_connection(DATABASE_URL)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):

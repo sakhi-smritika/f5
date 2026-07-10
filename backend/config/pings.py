@@ -3,13 +3,17 @@
 Module Exposes a function to test if all API and SECURE KEYs are work
 """
 
+import asyncio
 import functools
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 import requests
 from google import genai
 from openai import OpenAI
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
 from supabase import create_client
 
 logger = logging.getLogger(__name__)
@@ -165,6 +169,49 @@ def check_supabase_service_key(supabase_url, service_key) -> bool:
     except Exception as e:
         logger.error(
             "Supabase service key check failed",
+            extra={
+                "status": "failure",
+                "error": str(e),
+            },
+        )
+        raise
+
+@with_retries(retries=5)
+def check_database_connection(database_url) -> bool:
+    """To check if DATABASE_URL works for ADK's DatabaseSessionService.
+
+    ADK builds its session store with ``create_async_engine(DATABASE_URL)``, so the URL
+    must use an async driver (e.g. ``postgresql+asyncpg://user:pass@host:5432/postgres``).
+    Any URL/driver/connectivity problem is what ADK later re-raises as a ValueError on the
+    first chat request, so we mirror it here and actually open a connection to surface it
+    at startup instead.
+    """
+    try:
+        async def _probe() -> None:
+            engine = create_async_engine(database_url, pool_pre_ping=True)
+            try:
+                async with engine.connect() as conn:
+                    await conn.execute(text("SELECT 1"))
+            finally:
+                await engine.dispose()
+
+        # Run in a dedicated thread with its own event loop so this works whether or
+        # not the caller is already inside a running event loop (asyncio.run() would
+        # raise "cannot be called from a running event loop").
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            pool.submit(asyncio.run, _probe()).result()
+
+        logger.info(
+            "Database connection check passed",
+            extra={
+                "status": "success",
+            },
+        )
+        return True
+
+    except Exception as e:
+        logger.error(
+            "Database connection check failed",
             extra={
                 "status": "failure",
                 "error": str(e),
