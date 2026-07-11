@@ -132,7 +132,6 @@ export function DiaryPage() {
       <div className="diary-toolbar">
         <h1 className="diary-title">Diary</h1>
         <label className="diary-date">
-          <span>Date</span>
           <div className="diary-date-controls">
             <button
               type="button"

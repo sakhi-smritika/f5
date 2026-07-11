@@ -116,6 +116,19 @@ body.chat-collapsed #root {
   border-color: var(--accent-border);
 }
 
+.chat-collapse-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Show the "Collapse" text on desktop, the close (X) icon on phone. */
+.chat-close-icon {
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
 /* Body: conversation list + main chat */
 .chat-body {
   position: relative;
@@ -478,6 +491,30 @@ body.chat-collapsed #root {
   }
   body.chat-half #root {
     margin-right: 0;
+  }
+
+  /* On phone the panel is either fully open or fully hidden: the
+     collapsed rail is removed so it never crowds the app panes. */
+  body.chat-collapsed .chat-panel {
+    display: none;
+  }
+  body.chat-collapsed #root {
+    margin-right: 0;
+  }
+
+  /* Opened means fullscreen on phone, so the fullscreen toggle is
+     redundant and the collapse action becomes a close (X) icon. */
+  .chat-fullscreen-button {
+    display: none;
+  }
+  .chat-collapse-text {
+    display: none;
+  }
+  .chat-close-icon {
+    display: inline-flex;
+  }
+  .chat-collapse-button {
+    padding: 0.35rem;
   }
 
   /* Conversation list becomes a slide-over overlay on mobile */

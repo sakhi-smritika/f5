@@ -14,24 +14,8 @@ import {
 import { Composer } from './Composer'
 import { ConversationList } from './ConversationList'
 import { MessageList } from './MessageList'
+import { useChatUI } from './ChatUIContext'
 import './ChatPanel.css'
-
-type PanelMode = 'collapsed' | 'half' | 'full'
-
-const MODE_STORAGE_KEY = 'chatPanelMode'
-const BODY_CLASS: Record<PanelMode, string> = {
-  collapsed: 'chat-collapsed',
-  half: 'chat-half',
-  full: 'chat-full',
-}
-
-function readInitialMode(): PanelMode {
-  const stored = localStorage.getItem(MODE_STORAGE_KEY)
-  if (stored === 'collapsed' || stored === 'half' || stored === 'full') {
-    return stored
-  }
-  return 'half'
-}
 
 function moveToTop(conversations: Conversation[], id: string): Conversation[] {
   const target = conversations.find((conversation) => conversation.id === id)
@@ -61,21 +45,34 @@ function MenuIcon() {
   )
 }
 
+function CloseIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="20"
+      height="20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M18 6 6 18" />
+      <path d="M6 6l12 12" />
+    </svg>
+  )
+}
+
 export function ChatPanel() {
   const { user } = useAuth()
-  const [mode, setMode] = useState<PanelMode>(readInitialMode)
+  const { mode, setMode } = useChatUI()
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [streaming, setStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
-
-  useEffect(() => {
-    localStorage.setItem(MODE_STORAGE_KEY, mode)
-    document.body.classList.add(BODY_CLASS[mode])
-    return () => document.body.classList.remove(BODY_CLASS[mode])
-  }, [mode])
 
   useEffect(() => {
     if (!user?.id) {
@@ -268,7 +265,7 @@ export function ChatPanel() {
         <div className="chat-header-actions">
           <button
             type="button"
-            className="chat-header-button"
+            className="chat-header-button chat-fullscreen-button"
             onClick={() => setMode(mode === 'full' ? 'half' : 'full')}
             title={mode === 'full' ? 'Exit fullscreen' : 'Fullscreen'}
           >
@@ -276,11 +273,15 @@ export function ChatPanel() {
           </button>
           <button
             type="button"
-            className="chat-header-button"
+            className="chat-header-button chat-collapse-button"
             onClick={() => setMode('collapsed')}
-            title="Collapse"
+            aria-label="Close"
+            title="Close"
           >
-            Collapse
+            <span className="chat-collapse-text">Collapse</span>
+            <span className="chat-close-icon">
+              <CloseIcon />
+            </span>
           </button>
         </div>
       </header>

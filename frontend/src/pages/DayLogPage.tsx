@@ -115,7 +115,6 @@ export function DayLogPage() {
       <div className="daylog-toolbar">
         <h1 className="daylog-title">Day Log</h1>
         <label className="daylog-date">
-          <span>Date</span>
           <div className="daylog-date-controls">
             <button
               type="button"
