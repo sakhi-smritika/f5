@@ -37,6 +37,10 @@ class SendMessageBody(BaseModel):
     text: str
 
 
+class RenameConversationBody(BaseModel):
+    title: str
+
+
 def _derive_title(text: str) -> str:
     """Build a short conversation title from the first user message."""
     first_line = text.strip().splitlines()[0] if text.strip() else DEFAULT_TITLE
@@ -181,6 +185,29 @@ def _persist_after_turn(conversation: dict, conversation_id: str, user_text: str
     ).eq("id", conversation_id).execute()
 
     return new_title
+
+
+@router.patch("/conversations/{conversation_id}")
+async def rename_conversation(
+    conversation_id: str,
+    body: RenameConversationBody,
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> dict:
+    """Rename a conversation's sidebar title."""
+    _get_owned_conversation(conversation_id, user.id)
+
+    title = body.title.strip()
+    if not title:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Title cannot be empty",
+        )
+
+    get_supabase_service_client().table("conversations").update(
+        {"title": title}
+    ).eq("id", conversation_id).eq("user_id", user.id).execute()
+
+    return {"id": conversation_id, "title": title}
 
 
 @router.delete("/conversations/{conversation_id}")

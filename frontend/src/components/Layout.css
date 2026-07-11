@@ -1,10 +1,16 @@
 .layout-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.75rem 1.5rem;
+  height: var(--header-height);
+  padding: 0 1.5rem;
   border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  box-sizing: border-box;
 }
 
 .pane-nav {

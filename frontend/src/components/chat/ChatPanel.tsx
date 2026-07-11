@@ -6,6 +6,7 @@ import {
   deleteConversation,
   listConversations,
   loadMessages,
+  renameConversation,
   streamMessage,
   type ChatMessage,
   type Conversation,
@@ -114,6 +115,28 @@ export function ChatPanel() {
     [],
   )
 
+  const handleRename = useCallback(
+    async (id: string, title: string) => {
+      const trimmed = title.trim()
+      if (!trimmed) {
+        return
+      }
+      const previous = conversations
+      setConversations((prev) =>
+        prev.map((conversation) =>
+          conversation.id === id ? { ...conversation, title: trimmed } : conversation,
+        ),
+      )
+      try {
+        await renameConversation(id, trimmed)
+      } catch {
+        setConversations(previous)
+        setError('Failed to rename conversation')
+      }
+    },
+    [conversations],
+  )
+
   const handleSend = useCallback(
     async (text: string) => {
       if (streaming) {
@@ -185,9 +208,9 @@ export function ChatPanel() {
           type="button"
           className="chat-rail-button"
           onClick={() => setMode('half')}
-          title="Open assistant"
+          title="Open Sakhi Smritika"
         >
-          <span className="chat-rail-label">Assistant</span>
+          <span className="chat-rail-label">Sakhi Smritika</span>
         </button>
       </aside>,
       document.body,
@@ -197,7 +220,7 @@ export function ChatPanel() {
   return createPortal(
     <aside className="chat-panel">
       <header className="chat-header">
-        <span className="chat-header-title">Assistant</span>
+        <span className="chat-header-title">Sakhi Smritika</span>
         <div className="chat-header-actions">
           <button
             type="button"
@@ -225,6 +248,7 @@ export function ChatPanel() {
           onSelect={handleSelect}
           onNew={handleNew}
           onDelete={handleDelete}
+          onRename={handleRename}
         />
         <div className="chat-main">
           <MessageList messages={messages} streaming={streaming} error={error} />

@@ -51,6 +51,23 @@ export async function loadMessages(conversationId: string): Promise<ChatMessage[
   return data.messages ?? []
 }
 
+export async function renameConversation(
+  conversationId: string,
+  title: string,
+): Promise<{ id: string; title: string }> {
+  const response = await apiFetch(
+    `/api/v1/chat/conversations/${conversationId}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ title }),
+    },
+  )
+  if (!response.ok) {
+    throw new Error('Failed to rename conversation')
+  }
+  return response.json()
+}
+
 export async function deleteConversation(conversationId: string): Promise<void> {
   const response = await apiFetch(
     `/api/v1/chat/conversations/${conversationId}`,
