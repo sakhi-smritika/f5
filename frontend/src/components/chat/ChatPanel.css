@@ -74,14 +74,31 @@ body.chat-collapsed #root {
   box-sizing: border-box;
 }
 
+.chat-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
 .chat-header-title {
   color: var(--text-h);
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .chat-header-actions {
   display: flex;
   gap: 0.5rem;
+}
+
+.chat-sidebar-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem;
 }
 
 .chat-header-button {
@@ -101,6 +118,7 @@ body.chat-collapsed #root {
 
 /* Body: conversation list + main chat */
 .chat-body {
+  position: relative;
   display: flex;
   flex: 1;
   min-height: 0;
@@ -113,6 +131,16 @@ body.chat-collapsed #root {
   flex-direction: column;
   border-right: 1px solid var(--border);
   min-height: 0;
+}
+
+/* Collapsed sidebar (both desktop and mobile) */
+.chat-body.sidebar-closed .chat-conversations {
+  display: none;
+}
+
+/* Backdrop is only used for the mobile overlay */
+.chat-sidebar-backdrop {
+  display: none;
 }
 
 .chat-new {
@@ -425,14 +453,17 @@ body.chat-collapsed #root {
 }
 
 .chat-send {
-  padding: 0.5rem 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
   border: 1px solid var(--accent-border);
   border-radius: 0.5rem;
   background: var(--accent-bg);
   color: var(--accent);
   cursor: pointer;
-  font: inherit;
-  font-size: 15px;
   align-self: flex-end;
 }
 
@@ -448,7 +479,28 @@ body.chat-collapsed #root {
   body.chat-half #root {
     margin-right: 0;
   }
+
+  /* Conversation list becomes a slide-over overlay on mobile */
   .chat-conversations {
-    width: 160px;
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 80%;
+    max-width: 300px;
+    z-index: 20;
+    background: var(--bg);
+    box-shadow: var(--shadow);
+  }
+
+  .chat-body.sidebar-open .chat-sidebar-backdrop {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    border: none;
+    padding: 0;
+    background: rgba(0, 0, 0, 0.5);
+    cursor: pointer;
   }
 }

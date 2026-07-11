@@ -41,6 +41,26 @@ function moveToTop(conversations: Conversation[], id: string): Conversation[] {
   return [target, ...conversations.filter((conversation) => conversation.id !== id)]
 }
 
+function MenuIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="20"
+      height="20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 6h18" />
+      <path d="M3 12h18" />
+      <path d="M3 18h18" />
+    </svg>
+  )
+}
+
 export function ChatPanel() {
   const { user } = useAuth()
   const [mode, setMode] = useState<PanelMode>(readInitialMode)
@@ -49,6 +69,7 @@ export function ChatPanel() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [streaming, setStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
 
   useEffect(() => {
     localStorage.setItem(MODE_STORAGE_KEY, mode)
@@ -77,23 +98,34 @@ export function ChatPanel() {
     }
   }, [user?.id])
 
+  const closeSidebarOnMobile = useCallback(() => {
+    if (window.matchMedia('(max-width: 768px)').matches) {
+      setSidebarOpen(false)
+    }
+  }, [])
+
   const handleNew = useCallback(() => {
     setActiveId(null)
     setMessages([])
     setError(null)
-  }, [])
+    closeSidebarOnMobile()
+  }, [closeSidebarOnMobile])
 
-  const handleSelect = useCallback(async (id: string) => {
-    setActiveId(id)
-    setMessages([])
-    setError(null)
-    try {
-      const loaded = await loadMessages(id)
-      setMessages(loaded)
-    } catch {
-      setError('Failed to load messages')
-    }
-  }, [])
+  const handleSelect = useCallback(
+    async (id: string) => {
+      setActiveId(id)
+      setMessages([])
+      setError(null)
+      closeSidebarOnMobile()
+      try {
+        const loaded = await loadMessages(id)
+        setMessages(loaded)
+      } catch {
+        setError('Failed to load messages')
+      }
+    },
+    [closeSidebarOnMobile],
+  )
 
   const handleDelete = useCallback(
     async (id: string) => {
@@ -220,7 +252,19 @@ export function ChatPanel() {
   return createPortal(
     <aside className="chat-panel">
       <header className="chat-header">
-        <span className="chat-header-title">Sakhi Smritika</span>
+        <div className="chat-header-left">
+          <button
+            type="button"
+            className="chat-header-button chat-sidebar-toggle"
+            onClick={() => setSidebarOpen((open) => !open)}
+            aria-label={sidebarOpen ? 'Hide conversations' : 'Show conversations'}
+            aria-pressed={sidebarOpen}
+            title={sidebarOpen ? 'Hide conversations' : 'Show conversations'}
+          >
+            <MenuIcon />
+          </button>
+          <span className="chat-header-title">Sakhi Smritika</span>
+        </div>
         <div className="chat-header-actions">
           <button
             type="button"
@@ -241,7 +285,7 @@ export function ChatPanel() {
         </div>
       </header>
 
-      <div className="chat-body">
+      <div className={sidebarOpen ? 'chat-body sidebar-open' : 'chat-body sidebar-closed'}>
         <ConversationList
           conversations={conversations}
           activeId={activeId}
@@ -249,6 +293,12 @@ export function ChatPanel() {
           onNew={handleNew}
           onDelete={handleDelete}
           onRename={handleRename}
+        />
+        <button
+          type="button"
+          className="chat-sidebar-backdrop"
+          aria-label="Close conversations"
+          onClick={() => setSidebarOpen(false)}
         />
         <div className="chat-main">
           <MessageList messages={messages} streaming={streaming} error={error} />
