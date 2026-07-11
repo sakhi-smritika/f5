@@ -33,6 +33,7 @@ SUPABASE_SECRET_KEY = os.getenv("SUPABASE_SECRET_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
+PING = os.getenv("PING", "false")
 
 def _run_startup_checks() -> None:
     if SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY:
@@ -58,7 +59,12 @@ def create_app() -> FastAPI:
     The function to create the FastAPI application instance. To be used by main.py
     """
     setup_logging()
-    _run_startup_checks()
+    if PING.lower() == "true":
+        logger.info("Running startup checks because PING is true")
+        _run_startup_checks()
+    else:
+        logger.info("Skipping startup checks because PING is false")
+    
 
     app = FastAPI(title="My Sakhismritika Application", lifespan=lifespan)
     environment = os.getenv("ENVIRONMENT", "local") 
