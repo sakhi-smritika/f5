@@ -5,6 +5,8 @@ export type DayLog = Record<string, string>
 export type DiaryEntry = {
   id: string
   date: string
+  how_was_the_day: string | null
+  major_events: string | null
   general_content: string | null
   day_log: DayLog | null
   created_at: string
@@ -28,15 +30,23 @@ export async function getEntryByDate(date: string): Promise<DiaryEntry | null> {
 
 export async function saveEntry(params: {
   date: string
+  howWasTheDay: string
+  majorEvents: string
   generalContent: string
   userId: string
 }): Promise<DiaryEntry> {
-  const { date, generalContent, userId } = params
+  const { date, howWasTheDay, majorEvents, generalContent, userId } = params
 
   const { data, error } = await supabase
     .from('diary')
     .upsert(
-      { date, general_content: generalContent, user_id: userId },
+      {
+        date,
+        how_was_the_day: howWasTheDay,
+        major_events: majorEvents,
+        general_content: generalContent,
+        user_id: userId,
+      },
       { onConflict: 'user_id,date' },
     )
     .select('*')

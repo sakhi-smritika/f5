@@ -77,9 +77,45 @@
   font-size: 15px;
 }
 
+.diary-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.diary-field-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--text-h);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.diary-field-toggle:hover {
+  border-color: var(--accent-border);
+}
+
+.diary-field-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.diary-field-chevron {
+  color: var(--text);
+  font-size: 14px;
+}
+
 .diary-editor {
   width: 100%;
-  min-height: 320px;
+  min-height: 250px;
   padding: 1rem;
   border: 1px solid var(--border);
   border-radius: 0.75rem;

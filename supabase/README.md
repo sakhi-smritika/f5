@@ -11,6 +11,7 @@ migrations/                 # SQL migrations, applied in filename (timestamp) or
   20260710120250_diary.sql           # `diary` table (diary text + hourly day_log) + RLS
   20260711000000_public_users.sql    # `users` profile table + signup trigger + RLS
   20260711010000_chat_conversations.sql  # `conversations` chat metadata table + RLS
+  20260712000000_diary_add_columns.sql    # adds `how_was_the_day` + `major_events` to `diary`
 seed.py                     # Runner: executes python_seeds/*.py in numeric order
 python_seeds/
   001_seed_users.py         # Creates auth users via the Admin API (needs secret key)
@@ -24,6 +25,8 @@ One row per user per date. Stores both the free-text diary and the hourly day lo
 
 - `id uuid pk`, `user_id uuid -> auth.users` (cascade delete)
 - `date date`, unique together with `user_id` (`diary_user_id_date_key`) — enables upserts
+- `how_was_the_day text` — the Diary page's "How was the day?" reflection
+- `major_events text` — the Diary page's "Major events happened today"
 - `general_content text` — the Diary page's free text
 - `day_log jsonb` (default `{}`) — Day Log page's 24 hourly slots, keyed `"0"`..`"23"`
 - `created_at`, `updated_at` (auto-updated via `set_diary_updated_at` trigger)
