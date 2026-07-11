@@ -15,6 +15,9 @@ from google.adk.models.lite_llm import LiteLlm
 from google.adk.runners import Runner
 from google.adk.sessions import DatabaseSessionService
 
+from agent.tools.context import current_location_label, current_now_label
+from agent.tools.registry import ALL_TOOLS
+
 # ADK groups sessions/state under an app name. Keep this stable so previously
 # persisted conversations remain reachable across restarts and deploys.
 APP_NAME = "f5-chat"
@@ -25,23 +28,61 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "openai/gpt-4o")
 INSTRUCTION = (
     "You are a helpful, concise assistant embedded in a personal-growth web app. "
     "Be practical and encouraging. Use Markdown (lists, code blocks, bold) when it "
-    "improves clarity, and keep answers focused."
+    "improves clarity, and keep answers focused.\n\n"
+    "You can look up the signed-in user's own data with your tools: read their "
+    "profile (get_my_profile), fetch a diary entry for a date (get_diary_entry), "
+    "list recent entries (get_recent_diary_entries), search the diary by keyword "
+    "(search_diary), and read the hourly day log (get_day_log). Use these tools "
+    "whenever the user asks about themselves, their days, moods, events, or logs "
+    "instead of guessing. Dates are ISO YYYY-MM-DD. If a tool reports no entry, "
+    "say so plainly rather than inventing details."
 )
+
+
+def _instruction_provider(_ctx) -> str:
+    """Dynamic instruction: append the user's current local date/time and location.
+
+    These labels are set per request from the client, so the model can correctly
+    resolve relative dates like "today"/"yesterday" (instead of assuming its
+    training-time date) and reason about where the user is.
+    """
+    extras: list[str] = []
+
+    now_label = current_now_label.get()
+    if now_label:
+        extras.append(
+            f"The user's current local date and time is {now_label}. Always use "
+            "this as the reference point when resolving relative dates such as "
+            "'today', 'yesterday', 'this week' or 'last month'."
+        )
+
+    location_label = current_location_label.get()
+    if location_label:
+        extras.append(
+            f"The user's approximate location is {location_label}. Use it only "
+            "when location is relevant, and don't assume more precision than given."
+        )
+
+    if not extras:
+        return INSTRUCTION
+    return INSTRUCTION + "\n\n" + "\n\n".join(extras)
 
 
 def build_agent() -> LlmAgent:
     """Create the root agent.
 
-    To connect MCP servers later, add ``McpToolset(...)`` entries to ``tools``:
+    Tools are plain Python functions wrapped as ADK ``FunctionTool``s in
+    ``agent.tools.registry``. To connect MCP servers later, add ``McpToolset(...)``
+    entries alongside them:
 
         from google.adk.tools.mcp_tool import McpToolset, StreamableHTTPConnectionParams
-        tools=[McpToolset(connection_params=StreamableHTTPConnectionParams(url=..., headers=...))]
+        tools=[*ALL_TOOLS, McpToolset(connection_params=StreamableHTTPConnectionParams(url=..., headers=...))]
     """
     return LlmAgent(
         model=LiteLlm(model=OPENAI_MODEL),
         name="assistant",
-        instruction=INSTRUCTION,
-        tools=[],
+        instruction=_instruction_provider,
+        tools=list(ALL_TOOLS),
     )
 
 

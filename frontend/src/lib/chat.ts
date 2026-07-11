@@ -84,6 +84,86 @@ export type StreamHandlers = {
   onError: (message: string) => void
 }
 
+// The client's local clock, so the assistant can resolve relative dates like
+// "today" / "yesterday" using the user's timezone rather than the server's.
+function clientNow(): { client_date: string; client_time: string; client_timezone?: string } {
+  const now = new Date()
+  const pad = (value: number) => String(value).padStart(2, '0')
+  const client_date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+  const client_time = `${pad(now.getHours())}:${pad(now.getMinutes())}`
+  let client_timezone: string | undefined
+  try {
+    client_timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  } catch {
+    client_timezone = undefined
+  }
+  return { client_date, client_time, client_timezone }
+}
+
+// Cached so we only prompt for the geolocation permission and reverse-geocode
+// once per session. The browser itself only prompts once per site.
+let cachedLocation: string | null = null
+
+// Turn coordinates into a readable place (city/region/country) via a keyless
+// client-side reverse-geocoding endpoint. Returns null on any failure.
+async function reverseGeocode(latitude: number, longitude: number): Promise<string | null> {
+  try {
+    const response = await fetch(
+      `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`,
+    )
+    if (!response.ok) {
+      return null
+    }
+    const data = (await response.json()) as {
+      locality?: string
+      city?: string
+      principalSubdivision?: string
+      countryName?: string
+    }
+    const parts = [data.locality, data.city, data.principalSubdivision, data.countryName]
+      .map((part) => (typeof part === 'string' ? part.trim() : ''))
+      .filter(Boolean)
+    const unique = parts.filter((part, index) => parts.indexOf(part) === index)
+    return unique.length > 0 ? unique.join(', ') : null
+  } catch {
+    return null
+  }
+}
+
+// Resolves the user's approximate location as a readable place string, or null
+// if unavailable/denied. Never rejects, so a missing location just omits the
+// field from the request.
+async function clientLocation(): Promise<{ client_location: string } | null> {
+  if (cachedLocation) {
+    return { client_location: cachedLocation }
+  }
+  if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
+    return null
+  }
+  const coords = await new Promise<{ latitude: number; longitude: number } | null>(
+    (resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (position) =>
+          resolve({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          }),
+        () => resolve(null),
+        { timeout: 5000, maximumAge: 600000 },
+      )
+    },
+  )
+  if (!coords) {
+    return null
+  }
+  const label = await reverseGeocode(coords.latitude, coords.longitude)
+  if (!label) {
+    return null
+  }
+  cachedLocation = label
+  return { client_location: label }
+}
+
 // Sends a message and consumes the SSE stream. We use fetch (not EventSource)
 // because EventSource can't attach the Authorization header.
 export async function streamMessage(
@@ -91,11 +171,12 @@ export async function streamMessage(
   text: string,
   handlers: StreamHandlers,
 ): Promise<void> {
+  const location = await clientLocation()
   const response = await apiFetch(
     `/api/v1/chat/conversations/${conversationId}/messages`,
     {
       method: 'POST',
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, ...clientNow(), ...(location ?? {}) }),
       headers: { Accept: 'text/event-stream' },
     },
   )

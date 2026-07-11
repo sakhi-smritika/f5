@@ -11,6 +11,7 @@ these endpoints from the ADK session's event history.
 import json
 import logging
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
@@ -19,6 +20,11 @@ from google.genai import types
 from pydantic import BaseModel
 
 from agent.agent import APP_NAME, get_runner, get_session_service
+from agent.tools.context import (
+    current_location_label,
+    current_now_label,
+    current_user_id,
+)
 from config.auth import AuthenticatedUser, get_current_user
 from config.supabase import get_supabase_service_client
 
@@ -35,6 +41,14 @@ class CreateConversationBody(BaseModel):
 
 class SendMessageBody(BaseModel):
     text: str
+    # The client's current local clock, so the assistant can resolve relative
+    # dates ("today", "yesterday"). All optional; falls back to server UTC.
+    client_date: str | None = None
+    client_time: str | None = None
+    client_timezone: str | None = None
+    # The client's approximate location as a readable place (city/region/country),
+    # reverse-geocoded from browser geolocation when granted.
+    client_location: str | None = None
 
 
 class RenameConversationBody(BaseModel):
@@ -71,6 +85,33 @@ def _get_owned_conversation(conversation_id: str, user_id: str) -> dict:
 
 def _sse(payload: dict) -> str:
     return f"data: {json.dumps(payload)}\n\n"
+
+
+def _build_now_label(body: SendMessageBody) -> str:
+    """Build a human-readable current-date label from the client's clock.
+
+    Falls back to the server's UTC time if the client didn't send its date.
+    """
+    if body.client_date:
+        try:
+            weekday = datetime.strptime(body.client_date, "%Y-%m-%d").strftime("%A")
+        except ValueError:
+            weekday = ""
+        label = f"{weekday}, {body.client_date}".strip(", ")
+        if body.client_time:
+            label += f" {body.client_time}"
+        if body.client_timezone:
+            label += f" ({body.client_timezone})"
+        return label
+
+    now = datetime.now(timezone.utc)
+    return now.strftime("%A, %Y-%m-%d %H:%M (UTC)")
+
+
+def _build_location_label(body: SendMessageBody) -> str | None:
+    """Return the client's readable location, if provided."""
+    location = (body.client_location or "").strip()
+    return location or None
 
 
 @router.post("/conversations")
@@ -136,6 +177,10 @@ async def send_message(
 
     async def event_stream():
         streamed_any = False
+        # Scope tool calls to this user so tools read only their own data.
+        token = current_user_id.set(user.id)
+        now_token = current_now_label.set(_build_now_label(body))
+        location_token = current_location_label.set(_build_location_label(body))
         try:
             async for event in runner.run_async(
                 user_id=user.id,
@@ -160,6 +205,10 @@ async def send_message(
         except Exception:
             logger.exception("Chat stream failed", extra={"user_id": user.id})
             yield _sse({"error": "stream_failed"})
+        finally:
+            current_user_id.reset(token)
+            current_now_label.reset(now_token)
+            current_location_label.reset(location_token)
 
     return StreamingResponse(
         event_stream(),
