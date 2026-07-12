@@ -1,0 +1,128 @@
+.settings-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.settings-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.settings-title {
+  margin: 0;
+  font-size: 32px;
+}
+
+.settings-subtitle {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.settings-flash {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--accent-border);
+  border-radius: 0.5rem;
+  background: var(--accent-bg);
+  color: var(--text-h);
+  font-size: 15px;
+}
+
+.settings-error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 15px;
+}
+
+.settings-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--bg);
+}
+
+.settings-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.settings-card-title {
+  margin: 0 0 0.35rem;
+  font-size: 22px;
+}
+
+.settings-card-description {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.settings-badge {
+  flex-shrink: 0;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.settings-badge-connected {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+  color: var(--text-h);
+}
+
+.settings-connected-as {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.settings-card-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.settings-button {
+  padding: 0.55rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-h);
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.settings-button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.settings-button-primary {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+}
+
+.settings-button-primary:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.settings-button-secondary:hover:not(:disabled) {
+  border-color: var(--accent-border);
+}

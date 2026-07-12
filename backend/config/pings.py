@@ -10,11 +10,15 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 import requests
+from cryptography.fernet import Fernet, InvalidToken
 from google import genai
+from google_auth_oauthlib.flow import Flow
 from openai import OpenAI
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 from supabase import create_client
+
+from config.google_oauth import GOOGLE_SCOPES
 
 logger = logging.getLogger(__name__)
 
@@ -215,6 +219,163 @@ def check_database_connection(database_url) -> bool:
             extra={
                 "status": "failure",
                 "error": str(e),
+            },
+        )
+        raise
+
+
+@with_retries(retries=5)
+def check_google_token_enc_key(token_enc_key: str) -> bool:
+    """Verify GOOGLE_TOKEN_ENC_KEY is a valid Fernet key and can round-trip."""
+    try:
+        fernet = Fernet(token_enc_key.encode())
+        sample = "startup-ping-google-refresh-token"
+        encrypted = fernet.encrypt(sample.encode()).decode()
+        decrypted = fernet.decrypt(encrypted.encode()).decode()
+        if decrypted != sample:
+            raise RuntimeError("Fernet round-trip mismatch")
+
+        logger.info(
+            "Google token encryption key check passed",
+            extra={"status": "success"},
+        )
+        return True
+
+    except (InvalidToken, ValueError) as e:
+        logger.error(
+            "Google token encryption key check failed",
+            extra={
+                "status": "failure",
+                "error": (
+                    f"{e}. Generate a valid key with: "
+                    'python -c "from cryptography.fernet import Fernet; '
+                    'print(Fernet.generate_key().decode())"'
+                ),
+            },
+        )
+        raise
+
+
+@with_retries(retries=5)
+def check_google_oauth_flow(
+    client_id: str,
+    client_secret: str,
+    redirect_uri: str,
+) -> bool:
+    """Verify OAuth client config can build a consent URL."""
+    try:
+        flow = Flow.from_client_config(
+            {
+                "web": {
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "redirect_uris": [redirect_uri],
+                }
+            },
+            scopes=GOOGLE_SCOPES,
+        )
+        flow.redirect_uri = redirect_uri
+        auth_url, _ = flow.authorization_url(access_type="offline", prompt="consent")
+        if not auth_url.startswith("https://accounts.google.com/o/oauth2/auth"):
+            raise RuntimeError(f"Unexpected authorization URL: {auth_url[:80]}")
+
+        logger.info(
+            "Google OAuth flow check passed",
+            extra={
+                "status": "success",
+                "redirect_uri": redirect_uri,
+            },
+        )
+        return True
+
+    except Exception as e:
+        logger.error(
+            "Google OAuth flow check failed",
+            extra={
+                "status": "failure",
+                "error": str(e),
+            },
+        )
+        raise
+
+
+@with_retries(retries=5)
+def check_google_oauth_client(
+    client_id: str,
+    client_secret: str,
+    redirect_uri: str,
+) -> bool:
+    """Probe Google's token endpoint to confirm client id/secret are accepted.
+
+    We intentionally exchange a bogus authorization code. Google should answer
+    with ``invalid_grant`` when credentials are valid, or ``invalid_client``
+    when they are not.
+    """
+    try:
+        response = requests.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "code": "startup_ping_invalid_code",
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "redirect_uri": redirect_uri,
+                "grant_type": "authorization_code",
+            },
+            timeout=10,
+        )
+        body = response.json()
+        error = body.get("error", "")
+
+        if error == "invalid_client":
+            raise RuntimeError(
+                "Google rejected the OAuth client credentials (invalid_client)"
+            )
+        if error != "invalid_grant":
+            raise RuntimeError(
+                f"Unexpected Google token endpoint response: {body}"
+            )
+
+        logger.info(
+            "Google OAuth client credentials check passed",
+            extra={"status": "success"},
+        )
+        return True
+
+    except Exception as e:
+        logger.error(
+            "Google OAuth client credentials check failed",
+            extra={
+                "status": "failure",
+                "error": str(e),
+            },
+        )
+        raise
+
+
+@with_retries(retries=5)
+def check_google_connections_table(supabase_url: str, service_key: str) -> bool:
+    """Verify the google_connections table exists and is readable."""
+    try:
+        supabase = create_client(supabase_url, service_key)
+        supabase.table("google_connections").select("user_id").limit(1).execute()
+        logger.info(
+            "Google connections table check passed",
+            extra={"status": "success"},
+        )
+        return True
+
+    except Exception as e:
+        logger.error(
+            "Google connections table check failed",
+            extra={
+                "status": "failure",
+                "error": str(e),
+                "hint": (
+                    "Apply supabase/migrations/20260712100000_google_connections.sql "
+                    "if this table does not exist yet."
+                ),
             },
         )
         raise

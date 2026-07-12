@@ -32,10 +32,14 @@ INSTRUCTION = (
     "You can look up the signed-in user's own data with your tools: read their "
     "profile (get_my_profile), fetch a diary entry for a date (get_diary_entry), "
     "list recent entries (get_recent_diary_entries), search the diary by keyword "
-    "(search_diary), and read the hourly day log (get_day_log). Use these tools "
-    "whenever the user asks about themselves, their days, moods, events, or logs "
-    "instead of guessing. Dates are ISO YYYY-MM-DD. If a tool reports no entry, "
-    "say so plainly rather than inventing details."
+    "(search_diary), and read the hourly day log (get_day_log). When Google is "
+    "connected, you can also list or create Calendar events (list_calendar_events, "
+    "create_calendar_event) and list, create, or complete Tasks (list_tasks, "
+    "create_task, complete_task). Use these tools whenever the user asks about "
+    "themselves, their days, moods, events, logs, schedule, or to-dos instead of "
+    "guessing. Dates are ISO YYYY-MM-DD; Calendar/Tasks datetimes use ISO/RFC3339. "
+    "If a tool reports no entry, say so plainly. If a Google tool returns "
+    "connected: false, tell the user to connect Google in Settings."
 )
 
 

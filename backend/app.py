@@ -11,6 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from api.v1.integrations import callback_router as google_callback_router
 from api.v1.router import router as v1_router
 from config.logger import setup_logging
 from config.middleware import RequestLoggingMiddleware
@@ -20,6 +21,10 @@ from config.pings import (
     check_openai_api_key,
     check_gemini_api_key,
     check_database_connection,
+    check_google_token_enc_key,
+    check_google_oauth_flow,
+    check_google_oauth_client,
+    check_google_connections_table,
 )
 
 
@@ -33,19 +38,69 @@ SUPABASE_SECRET_KEY = os.getenv("SUPABASE_SECRET_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+GOOGLE_OAUTH_REDIRECT_URI = os.getenv("GOOGLE_OAUTH_REDIRECT_URI")
+GOOGLE_TOKEN_ENC_KEY = os.getenv("GOOGLE_TOKEN_ENC_KEY")
 PING = os.getenv("PING", "false")
 
 def _run_startup_checks() -> None:
     if SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY:
         check_supabase_connection(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY)
+    else:
+        logger.error("SUPABASE_URL and/or SUPABASE_PUBLISHABLE_KEY are not set")
+
     if SUPABASE_URL and SUPABASE_SECRET_KEY:
         check_supabase_service_key(SUPABASE_URL, SUPABASE_SECRET_KEY)
+    else:
+        logger.error("SUPABASE_URL and/or SUPABASE_SECRET_KEY are not set")
+
     if OPENAI_API_KEY:
         check_openai_api_key(OPENAI_API_KEY)
+    else:
+        logger.warning("OpenAI API key is not set")
+
     if GEMINI_API_KEY:
         check_gemini_api_key(GEMINI_API_KEY)
+    else:
+        logger.warning("Gemini API key is not set")
+
     if DATABASE_URL:
         check_database_connection(DATABASE_URL)
+    else:
+        logger.error("DATABASE_URL is not set")
+
+    google_vars = {
+        "GOOGLE_CLIENT_ID": GOOGLE_CLIENT_ID,
+        "GOOGLE_CLIENT_SECRET": GOOGLE_CLIENT_SECRET,
+        "GOOGLE_OAUTH_REDIRECT_URI": GOOGLE_OAUTH_REDIRECT_URI,
+        "GOOGLE_TOKEN_ENC_KEY": GOOGLE_TOKEN_ENC_KEY,
+    }
+    missing_google = [name for name, value in google_vars.items() if not value]
+    if missing_google:
+        logger.warning(
+            "Skipping Google integration checks; missing: %s",
+            ", ".join(missing_google),
+        )
+    else:
+        check_google_token_enc_key(GOOGLE_TOKEN_ENC_KEY)
+        check_google_oauth_flow(
+            GOOGLE_CLIENT_ID,
+            GOOGLE_CLIENT_SECRET,
+            GOOGLE_OAUTH_REDIRECT_URI,
+        )
+        check_google_oauth_client(
+            GOOGLE_CLIENT_ID,
+            GOOGLE_CLIENT_SECRET,
+            GOOGLE_OAUTH_REDIRECT_URI,
+        )
+        if SUPABASE_URL and SUPABASE_SECRET_KEY:
+            check_google_connections_table(SUPABASE_URL, SUPABASE_SECRET_KEY)
+        else:
+            logger.error(
+                "Skipping google_connections table check; "
+                "SUPABASE_URL and/or SUPABASE_SECRET_KEY are not set"
+            )
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -87,6 +142,7 @@ def create_app() -> FastAPI:
         )
     app.add_middleware(RequestLoggingMiddleware)
     app.include_router(v1_router)
+    app.include_router(google_callback_router)
 
     @app.get("/health")
     def health() -> dict:

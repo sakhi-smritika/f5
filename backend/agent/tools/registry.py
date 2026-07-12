@@ -13,6 +13,13 @@ from .diary_tools import (
     get_recent_diary_entries,
     search_diary,
 )
+from .google_tools import (
+    complete_task,
+    create_calendar_event,
+    create_task,
+    list_calendar_events,
+    list_tasks,
+)
 from .profile_tools import get_my_profile
 
 ALL_TOOLS: list[FunctionTool] = [
@@ -21,4 +28,9 @@ ALL_TOOLS: list[FunctionTool] = [
     FunctionTool(search_diary),
     FunctionTool(get_day_log),
     FunctionTool(get_my_profile),
+    FunctionTool(list_calendar_events),
+    FunctionTool(create_calendar_event),
+    FunctionTool(list_tasks),
+    FunctionTool(create_task),
+    FunctionTool(complete_task),
 ]

@@ -62,6 +62,10 @@ const paneCategories: PaneCategory[] = [
       { label: 'Day Log', to: '/introspection/day-log' },
     ],
   },
+  {
+    label: 'Settings',
+    items: [{ label: 'Integrations', to: '/settings' }],
+  },
 ]
 
 export function Layout() {
