@@ -15,7 +15,10 @@ from api.v1.integrations import callback_router as google_callback_router
 from api.v1.router import router as v1_router
 from config.logger import setup_logging
 from config.middleware import RequestLoggingMiddleware
+from config.llm_keys import PROVIDER_ENV_KEYS, get_model_provider
+from config.models import get_available_models
 from config.pings import (
+    check_anthropic_api_key,
     check_supabase_connection,
     check_supabase_service_key,
     check_openai_api_key,
@@ -37,6 +40,7 @@ SUPABASE_PUBLISHABLE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY")
 SUPABASE_SECRET_KEY = os.getenv("SUPABASE_SECRET_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
@@ -55,15 +59,25 @@ def _run_startup_checks() -> None:
     else:
         logger.error("SUPABASE_URL and/or SUPABASE_SECRET_KEY are not set")
 
-    if OPENAI_API_KEY:
-        check_openai_api_key(OPENAI_API_KEY)
-    else:
-        logger.warning("OpenAI API key is not set")
-
-    if GEMINI_API_KEY:
-        check_gemini_api_key(GEMINI_API_KEY)
-    else:
-        logger.warning("Gemini API key is not set")
+    provider_key_checks = {
+        "openai": (OPENAI_API_KEY, check_openai_api_key),
+        "gemini": (GEMINI_API_KEY, check_gemini_api_key),
+        "anthropic": (ANTHROPIC_API_KEY, check_anthropic_api_key),
+    }
+    required_providers = {
+        get_model_provider(model.id) for model in get_available_models()
+    }
+    for provider in sorted(required_providers):
+        env_key = PROVIDER_ENV_KEYS[provider]
+        api_key, check_fn = provider_key_checks[provider]
+        if api_key:
+            check_fn(api_key)
+        else:
+            logger.warning(
+                "%s is not set but is required for CHAT_MODELS provider %s",
+                env_key,
+                provider,
+            )
 
     if DATABASE_URL:
         check_database_connection(DATABASE_URL)

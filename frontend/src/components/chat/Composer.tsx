@@ -1,7 +1,12 @@
 import { useState } from 'react'
+import type { ChatModel } from '../../lib/models'
+import { ModelSelector } from './ModelSelector'
 
 type ComposerProps = {
   disabled: boolean
+  models: ChatModel[]
+  selectedModel: string
+  onModelChange: (modelId: string) => void
   onSend: (text: string) => void
 }
 
@@ -24,7 +29,13 @@ function SendIcon() {
   )
 }
 
-export function Composer({ disabled, onSend }: ComposerProps) {
+export function Composer({
+  disabled,
+  models,
+  selectedModel,
+  onModelChange,
+  onSend,
+}: ComposerProps) {
   const [text, setText] = useState('')
 
   const submit = () => {
@@ -51,16 +62,24 @@ export function Composer({ disabled, onSend }: ComposerProps) {
           }
         }}
       />
-      <button
-        type="button"
-        className="chat-send"
-        disabled={disabled || !text.trim()}
-        onClick={submit}
-        aria-label="Send message"
-        title="Send"
-      >
-        <SendIcon />
-      </button>
+      <div className="chat-composer-actions">
+        <ModelSelector
+          models={models}
+          value={selectedModel}
+          disabled={disabled}
+          onChange={onModelChange}
+        />
+        <button
+          type="button"
+          className="chat-send"
+          disabled={disabled || !text.trim()}
+          onClick={submit}
+          aria-label="Send message"
+          title="Send"
+        >
+          <SendIcon />
+        </button>
+      </div>
     </div>
   )
 }

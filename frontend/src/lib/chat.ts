@@ -170,13 +170,19 @@ export async function streamMessage(
   conversationId: string,
   text: string,
   handlers: StreamHandlers,
+  options: { model?: string } = {},
 ): Promise<void> {
   const location = await clientLocation()
   const response = await apiFetch(
     `/api/v1/chat/conversations/${conversationId}/messages`,
     {
       method: 'POST',
-      body: JSON.stringify({ text, ...clientNow(), ...(location ?? {}) }),
+      body: JSON.stringify({
+        text,
+        ...(options.model ? { model: options.model } : {}),
+        ...clientNow(),
+        ...(location ?? {}),
+      }),
       headers: { Accept: 'text/event-stream' },
     },
   )

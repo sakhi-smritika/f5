@@ -92,6 +92,39 @@ def check_gemini_api_key(gemini_key):
 
 
 @with_retries(retries=5)
+def check_anthropic_api_key(anthropic_key) -> bool:
+    """Check if an Anthropic API key works via LiteLLM."""
+    try:
+        import litellm
+
+        response = litellm.completion(
+            model="anthropic/claude-3-5-haiku-latest",
+            messages=[{"role": "user", "content": "Say OK"}],
+            api_key=anthropic_key,
+            max_tokens=16,
+        )
+        preview = response.choices[0].message.content if response.choices else None
+        logger.info(
+            "Anthropic API key check passed",
+            extra={
+                "status": "success",
+                "response_preview": preview[:10] if preview else None,
+            },
+        )
+        return True
+
+    except Exception as e:
+        logger.error(
+            "Anthropic API key check failed",
+            extra={
+                "status": "failure",
+                "error": str(e),
+            },
+        )
+        raise
+
+
+@with_retries(retries=5)
 def check_openai_api_key(openai_key) -> bool:
     """To Check if OPENAI API KEY works"""
     try:

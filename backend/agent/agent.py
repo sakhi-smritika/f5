@@ -1,7 +1,7 @@
 """
 ADK agent definition plus cached singletons for the session service and runner.
 
-The agent uses an OpenAI model through LiteLLM and persists every conversation
+The agent uses LiteLLM-backed models and persists every conversation
 (session + events) in the Supabase Postgres database via ADK's
 ``DatabaseSessionService``. Per-user isolation is enforced by keying every ADK
 session with the authenticated Supabase user id.
@@ -18,13 +18,12 @@ from google.adk.sessions import DatabaseSessionService
 from agent.profile_context import build_profile_instruction_context
 from agent.tools.context import current_location_label, current_now_label
 from agent.tools.registry import ALL_TOOLS
+from config.llm_keys import get_api_key_for_model
+from config.models import get_default_model_id
 
 # ADK groups sessions/state under an app name. Keep this stable so previously
 # persisted conversations remain reachable across restarts and deploys.
 APP_NAME = "f5-chat"
-
-# LiteLLM model string. "openai/<model>" routes to OpenAI using OPENAI_API_KEY.
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "openai/gpt-4o")
 
 INSTRUCTION = (
     "You are a helpful, concise assistant embedded in a personal-growth web app. "
@@ -75,7 +74,7 @@ def _instruction_provider(_ctx) -> str:
     return INSTRUCTION + "\n\n" + "\n\n".join(extras)
 
 
-def build_agent() -> LlmAgent:
+def build_agent(model_id: str | None = None) -> LlmAgent:
     """Create the root agent.
 
     Tools are plain Python functions wrapped as ADK ``FunctionTool``s in
@@ -85,8 +84,12 @@ def build_agent() -> LlmAgent:
         from google.adk.tools.mcp_tool import McpToolset, StreamableHTTPConnectionParams
         tools=[*ALL_TOOLS, McpToolset(connection_params=StreamableHTTPConnectionParams(url=..., headers=...))]
     """
+    resolved_model = model_id or get_default_model_id()
     return LlmAgent(
-        model=LiteLlm(model=OPENAI_MODEL),
+        model=LiteLlm(
+            model=resolved_model,
+            api_key=get_api_key_for_model(resolved_model),
+        ),
         name="assistant",
         instruction=_instruction_provider,
         tools=list(ALL_TOOLS),
@@ -110,10 +113,14 @@ def get_session_service() -> DatabaseSessionService:
 
 
 @lru_cache
-def get_runner() -> Runner:
+def _get_runner(model_id: str) -> Runner:
     """Cached ``Runner`` wiring the agent to the persistent session service."""
     return Runner(
-        agent=build_agent(),
+        agent=build_agent(model_id),
         app_name=APP_NAME,
         session_service=get_session_service(),
     )
+
+
+def get_runner(model_id: str | None = None) -> Runner:
+    return _get_runner(model_id or get_default_model_id())

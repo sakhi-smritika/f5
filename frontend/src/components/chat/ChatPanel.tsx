@@ -12,6 +12,12 @@ import {
   type ChatMessage,
   type Conversation,
 } from '../../lib/chat'
+import {
+  getStoredChatModel,
+  listChatModels,
+  setStoredChatModel,
+  type ChatModel,
+} from '../../lib/models'
 import { Composer } from './Composer'
 import { ConversationList } from './ConversationList'
 import { MessageList } from './MessageList'
@@ -55,6 +61,8 @@ export function ChatPanel() {
   const [streaming, setStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [models, setModels] = useState<ChatModel[]>([])
+  const [selectedModel, setSelectedModel] = useState('')
 
   useEffect(() => {
     if (!user?.id) {
@@ -76,6 +84,36 @@ export function ChatPanel() {
       cancelled = true
     }
   }, [user?.id])
+
+  useEffect(() => {
+    let cancelled = false
+    listChatModels()
+      .then(({ default: defaultModel, models: availableModels }) => {
+        if (cancelled) {
+          return
+        }
+        setModels(availableModels)
+        const stored = getStoredChatModel()
+        const initial =
+          stored && availableModels.some((model) => model.id === stored)
+            ? stored
+            : defaultModel
+        setSelectedModel(initial)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setModels([])
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const handleModelChange = useCallback((modelId: string) => {
+    setSelectedModel(modelId)
+    setStoredChatModel(modelId)
+  }, [])
 
   const closeSidebarOnMobile = useCallback(() => {
     if (window.matchMedia('(max-width: 768px)').matches) {
@@ -181,35 +219,41 @@ export function ChatPanel() {
       setStreaming(true)
 
       try {
-        await streamMessage(targetId, text, {
-          onDelta: (delta) =>
-            setMessages((prev) => {
-              const copy = prev.slice()
-              const last = copy[copy.length - 1]
-              copy[copy.length - 1] = { ...last, text: last.text + delta }
-              return copy
-            }),
-          onError: () => setError('The assistant failed to respond.'),
-          onDone: ({ title }) => {
-            setConversations((prev) => {
-              const updated = prev.map((conversation) =>
-                conversation.id === targetId
-                  ? {
-                      ...conversation,
-                      title: title ?? conversation.title,
-                      updated_at: new Date().toISOString(),
-                    }
-                  : conversation,
-              )
-              return moveToTop(updated, targetId)
-            })
+        await streamMessage(
+          targetId,
+          text,
+          {
+            onDelta: (delta) =>
+              setMessages((prev) => {
+                const copy = prev.slice()
+                const last = copy[copy.length - 1]
+                copy[copy.length - 1] = { ...last, text: last.text + delta }
+                return copy
+              }),
+            onError: (message) =>
+            setError(message || 'The assistant failed to respond.'),
+            onDone: ({ title }) => {
+              setConversations((prev) => {
+                const updated = prev.map((conversation) =>
+                  conversation.id === targetId
+                    ? {
+                        ...conversation,
+                        title: title ?? conversation.title,
+                        updated_at: new Date().toISOString(),
+                      }
+                    : conversation,
+                )
+                return moveToTop(updated, targetId)
+              })
+            },
           },
-        })
+          { model: selectedModel || undefined },
+        )
       } finally {
         setStreaming(false)
       }
     },
-    [activeId, streaming],
+    [activeId, selectedModel, streaming],
   )
 
   if (mode === 'collapsed') {
@@ -288,7 +332,13 @@ export function ChatPanel() {
         />
         <div className="chat-main">
           <MessageList messages={messages} streaming={streaming} error={error} />
-          <Composer disabled={streaming} onSend={handleSend} />
+          <Composer
+            disabled={streaming}
+            models={models}
+            selectedModel={selectedModel}
+            onModelChange={handleModelChange}
+            onSend={handleSend}
+          />
         </div>
       </div>
     </aside>,

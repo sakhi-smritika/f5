@@ -36,8 +36,10 @@ Copy `.env.example` to `.env`:
 | `SUPABASE_URL` | Supabase project URL |
 | `SUPABASE_PUBLISHABLE_KEY` | Supabase publishable (anon) key — used to validate user tokens |
 | `SUPABASE_SECRET_KEY` | Supabase service-role key (privileged ops, e.g. `conversations` writes) |
-| `OPENAI_API_KEY` | OpenAI key used by the chat agent (via LiteLLM) |
-| `OPENAI_MODEL` | LiteLLM model string (default `openai/gpt-4o`) |
+| `OPENAI_API_KEY` | OpenAI key — used when a `CHAT_MODELS` entry starts with `openai/` |
+| `GEMINI_API_KEY` | Google Gemini key — used when a model starts with `gemini/` |
+| `ANTHROPIC_API_KEY` | Anthropic key — used when a model starts with `anthropic/` |
+| `CHAT_MODELS` | Comma-separated LiteLLM model list for the chat UI (`id\|Label` or `id` only); first entry is the default |
 | `DATABASE_URL` | Async SQLAlchemy URL for ADK session persistence, e.g. `postgresql+asyncpg://postgres:<pwd>@<host>:5432/postgres` (must use the `asyncpg` driver) |
 | `ENVIRONMENT` | `local` or `production` (controls CORS policy) |
 
@@ -51,7 +53,7 @@ api/
     router.py           # /api/v1 router (all routes require auth); sample GET /hello; mounts chat
     chat.py             # /api/v1/chat endpoints (conversations, messages, SSE streaming)
 agent/
-  agent.py              # ADK LlmAgent (OpenAI via LiteLlm) + cached DatabaseSessionService & Runner
+  agent.py              # ADK LlmAgent (LiteLLM, multi-provider) + cached DatabaseSessionService & Runner
 config/
   supabase.py           # get_supabase_client() + get_supabase_service_client() (service-role)
   auth.py               # get_current_user() dependency + AuthenticatedUser
@@ -84,7 +86,7 @@ tests/
 
 ## Chatbot (ADK)
 
-The chat feature is powered by [Google ADK](https://adk.dev). `agent/agent.py` defines an `LlmAgent` that talks to OpenAI through `LiteLlm`, plus cached singletons for a `DatabaseSessionService` and a `Runner`.
+The chat feature is powered by [Google ADK](https://adk.dev). `agent/agent.py` defines an `LlmAgent` backed by LiteLLM (OpenAI, Gemini, Anthropic), plus cached singletons for a `DatabaseSessionService` and a `Runner`.
 
 - **Persistence (hybrid):** a conversation is an ADK *session*; its messages are ADK *events*, persisted by `DatabaseSessionService` in the Postgres database pointed at by `DATABASE_URL`. ADK auto-creates its own tables (`sessions`, `events`, `app_states`, `user_states`) on first use. A small `conversations` table (see `supabase/`) stores sidebar metadata (title, timestamps) for the history list.
 - **Isolation:** every session is keyed by the authenticated Supabase `user_id`; ownership of `conversations` rows is checked on each request. Metadata writes use the service-role client (`get_supabase_service_client`).

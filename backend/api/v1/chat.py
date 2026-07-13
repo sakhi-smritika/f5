@@ -26,6 +26,8 @@ from agent.tools.context import (
     current_user_id,
 )
 from config.auth import AuthenticatedUser, get_current_user
+from config.llm_keys import MissingApiKeyError, get_api_key_for_model
+from config.models import resolve_model
 from config.supabase import get_supabase_service_client
 
 logger = logging.getLogger(__name__)
@@ -41,6 +43,7 @@ class CreateConversationBody(BaseModel):
 
 class SendMessageBody(BaseModel):
     text: str
+    model: str | None = None
     # The client's current local clock, so the assistant can resolve relative
     # dates ("today", "yesterday"). All optional; falls back to server UTC.
     client_date: str | None = None
@@ -164,6 +167,21 @@ async def get_messages(
     return {"messages": messages}
 
 
+def _stream_error_message(exc: Exception, model_id: str) -> str:
+    """Turn an LLM exception into a short client-facing message."""
+    message = str(exc)
+    if "not_found_error" in message or "NotFoundError" in type(exc).__name__:
+        return f"Model not available: {model_id}. Check CHAT_MODELS uses a valid model id for your API key."
+    if "authentication" in message.lower() or "api_key" in message.lower():
+        return "Invalid or missing API key for the selected model's provider."
+    trimmed = message.strip()
+    if trimmed and len(trimmed) <= 200:
+        return trimmed
+    if trimmed:
+        return trimmed[:200] + "..."
+    return "The assistant failed to respond."
+
+
 @router.post("/conversations/{conversation_id}/messages")
 async def send_message(
     conversation_id: str,
@@ -172,7 +190,20 @@ async def send_message(
 ) -> StreamingResponse:
     """Send a user message and stream the assistant's reply back as SSE."""
     conversation = _get_owned_conversation(conversation_id, user.id)
-    runner = get_runner()
+    try:
+        model_id = resolve_model(body.model)
+        get_api_key_for_model(model_id)
+    except MissingApiKeyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    runner = get_runner(model_id)
     new_message = types.Content(role="user", parts=[types.Part(text=body.text)])
 
     async def event_stream():
@@ -202,9 +233,12 @@ async def send_message(
 
             title = _persist_after_turn(conversation, conversation_id, body.text)
             yield _sse({"done": True, "title": title})
-        except Exception:
-            logger.exception("Chat stream failed", extra={"user_id": user.id})
-            yield _sse({"error": "stream_failed"})
+        except Exception as exc:
+            logger.exception(
+                "Chat stream failed",
+                extra={"user_id": user.id, "model_id": model_id},
+            )
+            yield _sse({"error": _stream_error_message(exc, model_id)})
         finally:
             current_user_id.reset(token)
             current_now_label.reset(now_token)

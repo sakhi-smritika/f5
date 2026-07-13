@@ -112,7 +112,7 @@ def patch_chat(monkeypatch):
         if session_service is not None:
             monkeypatch.setattr(chat, "get_session_service", lambda: session_service)
         if runner is not None:
-            monkeypatch.setattr(chat, "get_runner", lambda: runner)
+            monkeypatch.setattr(chat, "get_runner", lambda model_id=None: runner)
         if supabase is not None:
             monkeypatch.setattr(chat, "get_supabase_service_client", lambda: supabase)
 
@@ -205,7 +205,23 @@ def test_send_message_streams_sse_and_sets_title(client, patch_chat):
     assert supabase.table_obj.updated[0]["title"] == "what is up"
 
 
-def test_delete_conversation(client, patch_chat):
+def test_send_message_rejects_unknown_model(client, patch_chat, monkeypatch):
+    monkeypatch.setenv(
+        "CHAT_MODELS",
+        "openai/gpt-4o|GPT-4o",
+    )
+    patch_chat(
+        session_service=FakeSessionService(session=SimpleNamespace(events=[])),
+        runner=FakeRunner([]),
+        supabase=FakeSupabase(select_data=OWNED_ROW),
+    )
+
+    response = client.post(
+        "/api/v1/chat/conversations/conv-1/messages",
+        json={"text": "hello", "model": "openai/unknown"},
+    )
+
+    assert response.status_code == 422
     session_service = FakeSessionService(session=SimpleNamespace(events=[]))
     supabase = FakeSupabase(select_data=OWNED_ROW)
     patch_chat(session_service=session_service, supabase=supabase)
