@@ -23,29 +23,14 @@
   position: relative;
 }
 
-.pane-category-button {
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  background: transparent;
-  color: var(--text-h);
-  cursor: pointer;
-  font: inherit;
-  font-size: 16px;
-}
-
-.pane-category-button:hover {
-  border-color: var(--accent-border);
-}
-
 .pane-menu {
   position: absolute;
   top: calc(100% + 0.25rem);
   left: 0;
   z-index: 10;
-  min-width: 10rem;
   display: flex;
   flex-direction: column;
+  gap: 0.25rem;
   padding: 0.25rem;
   border: 1px solid var(--border);
   border-radius: 0.5rem;
@@ -53,22 +38,16 @@
   box-shadow: var(--shadow);
 }
 
-.pane-menu-item {
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.375rem;
-  color: var(--text-h);
+.pane-menu-icon {
+  width: 2.5rem;
+  height: 2.5rem;
   text-decoration: none;
-  text-align: left;
-  font-size: 16px;
 }
 
-.pane-menu-item:hover {
+.pane-menu-icon.active {
+  border-color: var(--accent-border);
   background: var(--accent-bg);
-}
-
-.pane-menu-item.active {
   color: var(--accent);
-  background: var(--accent-bg);
 }
 
 .layout-account {
@@ -98,6 +77,30 @@
 
 .icon-button:hover {
   border-color: var(--accent-border);
+}
+
+.settings-menu {
+  position: relative;
+}
+
+.settings-dropdown {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  right: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--bg);
+  box-shadow: var(--shadow);
+}
+
+.settings-dropdown-item {
+  width: 2.5rem;
+  height: 2.5rem;
 }
 
 /* The chat open button is only needed on phones where the collapsed

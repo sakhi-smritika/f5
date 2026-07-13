@@ -1,71 +1,32 @@
 import { useEffect, useRef, useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import {
+  BookOpen,
+  Brain,
+  ListChecks,
+  LogOut,
+  MessageCircle,
+  Puzzle,
+  Settings,
+  type LucideIcon,
+} from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { getProfile } from '../lib/profile'
 import { ChatPanel } from './chat/ChatPanel'
 import { ChatUIProvider, useChatUI } from './chat/ChatUIContext'
 import './Layout.css'
 
-function ChatBubbleIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="20"
-      height="20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8A8.5 8.5 0 0 1 12.5 3 8.38 8.38 0 0 1 21 11.5Z" />
-    </svg>
-  )
-}
+const iconSize = 20
 
-function SignOutIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="20"
-      height="20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-      <path d="M16 17l5-5-5-5" />
-      <path d="M21 12H9" />
-    </svg>
-  )
-}
-
-type PaneItem = {
+type NavItem = {
   label: string
   to: string
+  Icon: LucideIcon
 }
 
-type PaneCategory = {
-  label: string
-  items: PaneItem[]
-}
-
-const paneCategories: PaneCategory[] = [
-  {
-    label: 'Introspection',
-    items: [
-      { label: 'Diary', to: '/introspection/diary' },
-      { label: 'Day Log', to: '/introspection/day-log' },
-    ],
-  },
-  {
-    label: 'Settings',
-    items: [{ label: 'Integrations', to: '/settings' }],
-  },
+const introspectionItems: NavItem[] = [
+  { label: 'Diary', to: '/introspection/diary', Icon: BookOpen },
+  { label: 'Day Log', to: '/introspection/day-log', Icon: ListChecks },
 ]
 
 export function Layout() {
@@ -78,16 +39,22 @@ export function Layout() {
 
 function LayoutInner() {
   const { user, signOut } = useAuth()
+  const navigate = useNavigate()
   const { setMode } = useChatUI()
-  const [openCategory, setOpenCategory] = useState<string | null>(null)
+  const [introspectionOpen, setIntrospectionOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [confirmSignOut, setConfirmSignOut] = useState(false)
   const [displayName, setDisplayName] = useState<string | null>(null)
-  const navRef = useRef<HTMLElement | null>(null)
+  const introspectionRef = useRef<HTMLDivElement | null>(null)
+  const settingsRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (navRef.current && !navRef.current.contains(event.target as Node)) {
-        setOpenCategory(null)
+      if (introspectionRef.current && !introspectionRef.current.contains(event.target as Node)) {
+        setIntrospectionOpen(false)
+      }
+      if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
+        setSettingsOpen(false)
       }
     }
 
@@ -128,39 +95,39 @@ function LayoutInner() {
   return (
     <>
       <header className="layout-header">
-        <nav className="pane-nav" ref={navRef}>
-          {paneCategories.map((category) => (
-            <div className="pane-category" key={category.label}>
-              <button
-                type="button"
-                className="pane-category-button"
-                aria-expanded={openCategory === category.label}
-                onClick={() =>
-                  setOpenCategory((current) =>
-                    current === category.label ? null : category.label,
-                  )
-                }
-              >
-                {category.label}
-              </button>
-              {openCategory === category.label ? (
-                <div className="pane-menu">
-                  {category.items.map((item) => (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      className={({ isActive }) =>
-                        isActive ? 'pane-menu-item active' : 'pane-menu-item'
-                      }
-                      onClick={() => setOpenCategory(null)}
-                    >
-                      {item.label}
-                    </NavLink>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          ))}
+        <nav className="pane-nav">
+          <div className="pane-category" ref={introspectionRef}>
+            <button
+              type="button"
+              className="icon-button"
+              aria-expanded={introspectionOpen}
+              aria-label="Introspection"
+              title="Introspection"
+              onClick={() => setIntrospectionOpen((open) => !open)}
+            >
+              <Brain size={iconSize} aria-hidden="true" />
+            </button>
+            {introspectionOpen ? (
+              <div className="pane-menu">
+                {introspectionItems.map(({ label, to, Icon }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    className={({ isActive }) =>
+                      isActive
+                        ? 'icon-button pane-menu-icon active'
+                        : 'icon-button pane-menu-icon'
+                    }
+                    aria-label={label}
+                    title={label}
+                    onClick={() => setIntrospectionOpen(false)}
+                  >
+                    <Icon size={iconSize} aria-hidden="true" />
+                  </NavLink>
+                ))}
+              </div>
+            ) : null}
+          </div>
         </nav>
 
         <div className="layout-account">
@@ -172,17 +139,48 @@ function LayoutInner() {
             aria-label="Open Sakhi Smritika"
             title="Open Sakhi Smritika"
           >
-            <ChatBubbleIcon />
+            <MessageCircle size={iconSize} aria-hidden="true" />
           </button>
-          <button
-            type="button"
-            className="icon-button sign-out"
-            onClick={() => setConfirmSignOut(true)}
-            aria-label="Sign out"
-            title="Sign out"
-          >
-            <SignOutIcon />
-          </button>
+          <div className="settings-menu" ref={settingsRef}>
+            <button
+              type="button"
+              className="icon-button"
+              aria-expanded={settingsOpen}
+              aria-label="Settings"
+              title="Settings"
+              onClick={() => setSettingsOpen((open) => !open)}
+            >
+              <Settings size={iconSize} aria-hidden="true" />
+            </button>
+            {settingsOpen ? (
+              <div className="settings-dropdown">
+                <button
+                  type="button"
+                  className="icon-button settings-dropdown-item"
+                  aria-label="Integrations"
+                  title="Integrations"
+                  onClick={() => {
+                    setSettingsOpen(false)
+                    navigate('/settings')
+                  }}
+                >
+                  <Puzzle size={iconSize} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className="icon-button settings-dropdown-item"
+                  aria-label="Sign out"
+                  title="Sign out"
+                  onClick={() => {
+                    setSettingsOpen(false)
+                    setConfirmSignOut(true)
+                  }}
+                >
+                  <LogOut size={iconSize} aria-hidden="true" />
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
       </header>
 

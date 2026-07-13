@@ -21,12 +21,6 @@
   font-size: 32px;
 }
 
-.settings-subtitle {
-  margin: 0;
-  color: var(--text);
-  font-size: 15px;
-}
-
 .settings-flash {
   margin: 0;
   padding: 0.75rem 1rem;
@@ -43,86 +37,55 @@
   font-size: 15px;
 }
 
-.settings-card {
+.settings-row {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
   gap: 1rem;
-  padding: 1.25rem;
+  padding: 0.75rem 1rem;
   border: 1px solid var(--border);
-  border-radius: 0.75rem;
+  border-radius: 0.5rem;
   background: var(--bg);
 }
 
-.settings-card-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.settings-card-title {
-  margin: 0 0 0.35rem;
-  font-size: 22px;
-}
-
-.settings-card-description {
-  margin: 0;
-  color: var(--text);
+.settings-row-label {
+  color: var(--text-h);
   font-size: 15px;
-  line-height: 1.45;
 }
 
-.settings-badge {
+.settings-switch {
+  position: relative;
   flex-shrink: 0;
-  padding: 0.25rem 0.6rem;
-  border: 1px solid var(--border);
+  width: 2.75rem;
+  height: 1.5rem;
+  padding: 0;
+  border: none;
   border-radius: 999px;
-  font-size: 13px;
-  color: var(--text);
-}
-
-.settings-badge-connected {
-  border-color: var(--accent-border);
-  background: var(--accent-bg);
-  color: var(--text-h);
-}
-
-.settings-connected-as {
-  margin: 0;
-  color: var(--text);
-  font-size: 15px;
-}
-
-.settings-card-actions {
-  display: flex;
-  gap: 0.75rem;
-}
-
-.settings-button {
-  padding: 0.55rem 1rem;
-  border-radius: 0.5rem;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-h);
-  font: inherit;
-  font-size: 15px;
+  background: #9ca3af;
   cursor: pointer;
+  transition: background-color 0.2s ease;
 }
 
-.settings-button:disabled {
+.settings-switch:disabled {
   opacity: 0.55;
   cursor: default;
 }
 
-.settings-button-primary {
-  border-color: var(--accent-border);
-  background: var(--accent-bg);
+.settings-switch-on {
+  background: #22c55e;
 }
 
-.settings-button-primary:hover:not(:disabled) {
-  border-color: var(--accent);
+.settings-switch-thumb {
+  position: absolute;
+  top: 0.125rem;
+  left: 0.125rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s ease;
 }
 
-.settings-button-secondary:hover:not(:disabled) {
-  border-color: var(--accent-border);
+.settings-switch-on .settings-switch-thumb {
+  transform: translateX(1.25rem);
 }
