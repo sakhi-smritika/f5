@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { Maximize2, Minimize2, PanelRightClose, X } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import {
   createConversation,
@@ -41,25 +42,6 @@ function MenuIcon() {
       <path d="M3 6h18" />
       <path d="M3 12h18" />
       <path d="M3 18h18" />
-    </svg>
-  )
-}
-
-function CloseIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="20"
-      height="20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M18 6 6 18" />
-      <path d="M6 6l12 12" />
     </svg>
   )
 }
@@ -267,20 +249,23 @@ export function ChatPanel() {
             type="button"
             className="chat-header-button chat-fullscreen-button"
             onClick={() => setMode(mode === 'full' ? 'half' : 'full')}
+            aria-label={mode === 'full' ? 'Exit fullscreen' : 'Fullscreen'}
             title={mode === 'full' ? 'Exit fullscreen' : 'Fullscreen'}
           >
-            {mode === 'full' ? 'Exit fullscreen' : 'Fullscreen'}
+            {mode === 'full' ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
           </button>
           <button
             type="button"
             className="chat-header-button chat-collapse-button"
             onClick={() => setMode('collapsed')}
-            aria-label="Close"
-            title="Close"
+            aria-label="Collapse"
+            title="Collapse"
           >
-            <span className="chat-collapse-text">Collapse</span>
+            <span className="chat-collapse-icon">
+              <PanelRightClose size={20} />
+            </span>
             <span className="chat-close-icon">
-              <CloseIcon />
+              <X size={20} />
             </span>
           </button>
         </div>

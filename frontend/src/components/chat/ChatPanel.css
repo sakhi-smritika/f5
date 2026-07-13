@@ -102,7 +102,10 @@ body.chat-collapsed #root {
 }
 
 .chat-header-button {
-  padding: 0.35rem 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem;
   border: 1px solid var(--border);
   border-radius: 0.5rem;
   background: transparent;
@@ -122,7 +125,13 @@ body.chat-collapsed #root {
   justify-content: center;
 }
 
-/* Show the "Collapse" text on desktop, the close (X) icon on phone. */
+/* Show the collapse icon on desktop, the close (X) icon on phone. */
+.chat-collapse-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .chat-close-icon {
   display: none;
   align-items: center;
@@ -507,7 +516,7 @@ body.chat-collapsed #root {
   .chat-fullscreen-button {
     display: none;
   }
-  .chat-collapse-text {
+  .chat-collapse-icon {
     display: none;
   }
   .chat-close-icon {
