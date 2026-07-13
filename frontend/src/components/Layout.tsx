@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   BookOpen,
   Brain,
+  Icon,
   ListChecks,
   LogOut,
   MessageCircle,
@@ -10,6 +11,7 @@ import {
   Settings,
   type LucideIcon,
 } from 'lucide-react'
+import { targetArrow } from '@lucide/lab'
 import { useAuth } from '../context/AuthContext'
 import { getProfile } from '../lib/profile'
 import { ChatPanel } from './chat/ChatPanel'
@@ -128,6 +130,14 @@ function LayoutInner() {
               </div>
             ) : null}
           </div>
+          <NavLink
+            to="/goals"
+            className={({ isActive }) => (isActive ? 'icon-button active' : 'icon-button')}
+            aria-label="Goals"
+            title="Goals"
+          >
+            <Icon iconNode={targetArrow} size={iconSize} aria-hidden="true" />
+          </NavLink>
         </nav>
 
         <div className="layout-account">

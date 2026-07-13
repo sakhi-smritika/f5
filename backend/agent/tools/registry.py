@@ -20,6 +20,7 @@ from .google_tools import (
     list_calendar_events,
     list_tasks,
 )
+from .goals_tools import get_goal, list_child_goals, list_my_goals, search_goals
 from .profile_tools import get_my_profile
 
 ALL_TOOLS: list[FunctionTool] = [
@@ -28,6 +29,10 @@ ALL_TOOLS: list[FunctionTool] = [
     FunctionTool(search_diary),
     FunctionTool(get_day_log),
     FunctionTool(get_my_profile),
+    FunctionTool(list_my_goals),
+    FunctionTool(get_goal),
+    FunctionTool(list_child_goals),
+    FunctionTool(search_goals),
     FunctionTool(list_calendar_events),
     FunctionTool(create_calendar_event),
     FunctionTool(list_tasks),

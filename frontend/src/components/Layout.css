@@ -79,6 +79,12 @@
   border-color: var(--accent-border);
 }
 
+.icon-button.active {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
 .settings-menu {
   position: relative;
 }
