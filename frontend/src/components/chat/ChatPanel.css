@@ -18,7 +18,26 @@ body.chat-half .chat-panel {
 }
 
 body.chat-full .chat-panel {
-  width: 100vw;
+  left: 0;
+  right: 0;
+  width: auto;
+  border-left: none;
+  align-items: center;
+}
+
+body.chat-full #root {
+  display: none;
+}
+
+body.chat-full {
+  overflow: hidden;
+}
+
+body.chat-full .chat-header,
+body.chat-full .chat-body {
+  width: 100%;
+  max-width: 72rem;
+  box-sizing: border-box;
 }
 
 body.chat-collapsed .chat-panel {
