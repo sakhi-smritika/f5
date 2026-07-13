@@ -15,6 +15,7 @@ from google.adk.models.lite_llm import LiteLlm
 from google.adk.runners import Runner
 from google.adk.sessions import DatabaseSessionService
 
+from agent.profile_context import build_profile_instruction_context
 from agent.tools.context import current_location_label, current_now_label
 from agent.tools.registry import ALL_TOOLS
 
@@ -29,8 +30,7 @@ INSTRUCTION = (
     "You are a helpful, concise assistant embedded in a personal-growth web app. "
     "Be practical and encouraging. Use Markdown (lists, code blocks, bold) when it "
     "improves clarity, and keep answers focused.\n\n"
-    "You can look up the signed-in user's own data with your tools: read their "
-    "profile (get_my_profile), fetch a diary entry for a date (get_diary_entry), "
+    "You can look up the signed-in user's own data with your tools: fetch a diary entry for a date (get_diary_entry), "
     "list recent entries (get_recent_diary_entries), search the diary by keyword "
     "(search_diary), and read the hourly day log (get_day_log). For goals, list "
     "all goals (list_my_goals), fetch one by id (get_goal), list sub-goals under "
@@ -41,17 +41,14 @@ INSTRUCTION = (
     "themselves, their days, moods, events, logs, goals, schedule, or to-dos instead of "
     "guessing. Dates are ISO YYYY-MM-DD; Calendar/Tasks datetimes use ISO/RFC3339. "
     "If a tool reports no entry, say so plainly. If a Google tool returns "
-    "connected: false, tell the user to connect Google in Settings."
+    "connected: false, tell the user to connect Google in Settings. The user's "
+    "profile (name, background, and custom instructions) is already included in "
+    "your system instructions — do not call a tool for it."
 )
 
 
 def _instruction_provider(_ctx) -> str:
-    """Dynamic instruction: append the user's current local date/time and location.
-
-    These labels are set per request from the client, so the model can correctly
-    resolve relative dates like "today"/"yesterday" (instead of assuming its
-    training-time date) and reason about where the user is.
-    """
+    """Dynamic instruction: append profile, date/time, and location per request."""
     extras: list[str] = []
 
     now_label = current_now_label.get()
@@ -68,6 +65,10 @@ def _instruction_provider(_ctx) -> str:
             f"The user's approximate location is {location_label}. Use it only "
             "when location is relevant, and don't assume more precision than given."
         )
+
+    profile_context = build_profile_instruction_context()
+    if profile_context:
+        extras.append(profile_context)
 
     if not extras:
         return INSTRUCTION

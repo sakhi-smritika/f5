@@ -9,6 +9,7 @@ import {
   MessageCircle,
   Puzzle,
   Settings,
+  User,
   type LucideIcon,
 } from 'lucide-react'
 import { targetArrow } from '@lucide/lab'
@@ -76,7 +77,7 @@ function LayoutInner() {
       try {
         const profile = await getProfile(user.id)
         if (!cancelled) {
-          setDisplayName(profile?.display_name ?? null)
+          setDisplayName(profile?.full_name ?? profile?.display_name ?? null)
         }
       } catch {
         if (!cancelled) {
@@ -164,6 +165,18 @@ function LayoutInner() {
             </button>
             {settingsOpen ? (
               <div className="settings-dropdown">
+                <button
+                  type="button"
+                  className="icon-button settings-dropdown-item"
+                  aria-label="Profile"
+                  title="Profile"
+                  onClick={() => {
+                    setSettingsOpen(false)
+                    navigate('/profile')
+                  }}
+                >
+                  <User size={iconSize} aria-hidden="true" />
+                </button>
                 <button
                   type="button"
                   className="icon-button settings-dropdown-item"

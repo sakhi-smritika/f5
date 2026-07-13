@@ -5,6 +5,7 @@ import { DayLogPage } from './pages/DayLogPage'
 import { DiaryPage } from './pages/DiaryPage'
 import { GoalsPage } from './pages/GoalsPage'
 import { LoginPage } from './pages/LoginPage'
+import { ProfilePage } from './pages/ProfilePage'
 import { SettingsPage } from './pages/SettingsPage'
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
             <Route path="/introspection/day-log" element={<DayLogPage />} />
             <Route path="/goals" element={<GoalsPage />} />
             <Route path="/goals/:goalId" element={<GoalsPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/" element={<Navigate to="/introspection/diary" replace />} />
           </Route>

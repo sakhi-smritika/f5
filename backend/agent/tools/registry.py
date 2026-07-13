@@ -21,14 +21,12 @@ from .google_tools import (
     list_tasks,
 )
 from .goals_tools import get_goal, list_child_goals, list_my_goals, search_goals
-from .profile_tools import get_my_profile
 
 ALL_TOOLS: list[FunctionTool] = [
     FunctionTool(get_diary_entry),
     FunctionTool(get_recent_diary_entries),
     FunctionTool(search_diary),
     FunctionTool(get_day_log),
-    FunctionTool(get_my_profile),
     FunctionTool(list_my_goals),
     FunctionTool(get_goal),
     FunctionTool(list_child_goals),
