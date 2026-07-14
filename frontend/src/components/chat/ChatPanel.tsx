@@ -9,6 +9,7 @@ import {
   loadMessages,
   renameConversation,
   streamMessage,
+  type ChatAttachment,
   type ChatMessage,
   type Conversation,
 } from '../../lib/chat'
@@ -186,34 +187,46 @@ export function ChatPanel() {
     [conversations],
   )
 
+  const ensureConversation = useCallback(async (): Promise<string | null> => {
+    if (activeId) {
+      return activeId
+    }
+    try {
+      const created = await createConversation()
+      const now = new Date().toISOString()
+      setActiveId(created.id)
+      setConversations((prev) => [
+        { id: created.id, title: created.title, created_at: now, updated_at: now },
+        ...prev,
+      ])
+      return created.id
+    } catch {
+      setError('Failed to start a conversation')
+      return null
+    }
+  }, [activeId])
+
   const handleSend = useCallback(
-    async (text: string) => {
+    async ({
+      text,
+      attachments,
+    }: {
+      text: string
+      attachments: ChatAttachment[]
+    }) => {
       if (streaming) {
         return
       }
 
-      let conversationId = activeId
-      if (!conversationId) {
-        try {
-          const created = await createConversation()
-          conversationId = created.id
-          const now = new Date().toISOString()
-          setActiveId(created.id)
-          setConversations((prev) => [
-            { id: created.id, title: created.title, created_at: now, updated_at: now },
-            ...prev,
-          ])
-        } catch {
-          setError('Failed to start a conversation')
-          return
-        }
+      const targetId = await ensureConversation()
+      if (!targetId) {
+        return
       }
 
-      const targetId = conversationId
       setError(null)
       setMessages((prev) => [
         ...prev,
-        { role: 'user', text },
+        { role: 'user', text, attachments },
         { role: 'assistant', text: '' },
       ])
       setStreaming(true)
@@ -247,13 +260,16 @@ export function ChatPanel() {
               })
             },
           },
-          { model: selectedModel || undefined },
+          {
+            model: selectedModel || undefined,
+            attachmentIds: attachments.map((attachment) => attachment.id),
+          },
         )
       } finally {
         setStreaming(false)
       }
     },
-    [activeId, selectedModel, streaming],
+    [ensureConversation, selectedModel, streaming],
   )
 
   if (mode === 'collapsed') {
@@ -338,6 +354,7 @@ export function ChatPanel() {
             selectedModel={selectedModel}
             onModelChange={handleModelChange}
             onSend={handleSend}
+            ensureConversation={ensureConversation}
           />
         </div>
       </div>

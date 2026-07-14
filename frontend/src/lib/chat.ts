@@ -3,9 +3,58 @@ import { supabase } from './supabase'
 
 export type ChatRole = 'user' | 'assistant'
 
+export type ChatAttachment = {
+  id: string
+  filename: string
+  mime_type: string
+  size_bytes: number
+  url?: string
+}
+
 export type ChatMessage = {
   role: ChatRole
   text: string
+  event_id?: string
+  attachments?: ChatAttachment[]
+}
+
+export async function uploadAttachment(
+  conversationId: string,
+  file: File,
+): Promise<ChatAttachment> {
+  const form = new FormData()
+  form.append('file', file)
+  // No explicit Content-Type: the browser sets the multipart boundary.
+  const response = await apiFetch(
+    `/api/v1/chat/conversations/${conversationId}/attachments`,
+    { method: 'POST', body: form },
+  )
+  if (!response.ok) {
+    let detail = 'Failed to upload file'
+    try {
+      const data = (await response.json()) as { detail?: string }
+      if (data.detail) {
+        detail = data.detail
+      }
+    } catch {
+      // keep default
+    }
+    throw new Error(detail)
+  }
+  return response.json()
+}
+
+export async function deleteAttachment(
+  conversationId: string,
+  attachmentId: string,
+): Promise<void> {
+  const response = await apiFetch(
+    `/api/v1/chat/conversations/${conversationId}/attachments/${attachmentId}`,
+    { method: 'DELETE' },
+  )
+  if (!response.ok) {
+    throw new Error('Failed to remove file')
+  }
 }
 
 export type Conversation = {
@@ -170,7 +219,7 @@ export async function streamMessage(
   conversationId: string,
   text: string,
   handlers: StreamHandlers,
-  options: { model?: string } = {},
+  options: { model?: string; attachmentIds?: string[] } = {},
 ): Promise<void> {
   const location = await clientLocation()
   const response = await apiFetch(
@@ -180,6 +229,9 @@ export async function streamMessage(
       body: JSON.stringify({
         text,
         ...(options.model ? { model: options.model } : {}),
+        ...(options.attachmentIds && options.attachmentIds.length > 0
+          ? { attachment_ids: options.attachmentIds }
+          : {}),
         ...clientNow(),
         ...(location ?? {}),
       }),

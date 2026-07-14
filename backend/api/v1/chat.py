@@ -13,19 +13,30 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
 from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.genai import types
 from pydantic import BaseModel
 
 from agent.agent import APP_NAME, get_runner, get_session_service
+from agent.attachment_parts import build_user_message_parts, is_attachment_text
 from agent.tools.context import (
     current_location_label,
     current_now_label,
     current_user_id,
 )
 from config.auth import AuthenticatedUser, get_current_user
+from config.chat_attachments import (
+    attachment_row_to_api,
+    build_storage_path,
+    create_signed_url,
+    delete_from_storage,
+    download_from_storage,
+    new_attachment_id,
+    upload_to_storage,
+    validate_upload_file,
+)
 from config.llm_keys import MissingApiKeyError, get_api_key_for_model
 from config.models import resolve_model
 from config.supabase import get_supabase_service_client
@@ -43,6 +54,7 @@ class CreateConversationBody(BaseModel):
 
 class SendMessageBody(BaseModel):
     text: str
+    attachment_ids: list[str] = []
     model: str | None = None
     # The client's current local clock, so the assistant can resolve relative
     # dates ("today", "yesterday"). All optional; falls back to server UTC.
@@ -84,6 +96,40 @@ def _get_owned_conversation(conversation_id: str, user_id: str) -> dict:
             status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found"
         )
     return rows[0]
+
+
+def _fetch_pending_attachments(
+    conversation_id: str, user_id: str, attachment_ids: list[str]
+) -> list[dict]:
+    """Fetch attachment rows that belong to the user/conversation and are unsent.
+
+    Preserves the order of ``attachment_ids`` so files appear as the user added
+    them. Raises 404 if any requested id is missing, foreign, or already linked.
+    """
+    if not attachment_ids:
+        return []
+
+    client = get_supabase_service_client()
+    result = (
+        client.table("chat_attachments")
+        .select("*")
+        .eq("conversation_id", conversation_id)
+        .eq("user_id", user_id)
+        .is_("adk_event_id", "null")
+        .in_("id", attachment_ids)
+        .execute()
+    )
+    rows = {row["id"]: row for row in (result.data or [])}
+    ordered: list[dict] = []
+    for attachment_id in attachment_ids:
+        row = rows.get(attachment_id)
+        if row is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Attachment not found or already sent: {attachment_id}",
+            )
+        ordered.append(row)
+    return ordered
 
 
 def _sse(payload: dict) -> str:
@@ -154,17 +200,128 @@ async def get_messages(
             status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found"
         )
 
+    attachments_by_event = _load_attachments_by_event(conversation_id, user.id)
+
     messages: list[dict] = []
     for event in session.events:
         if not event.content or not event.content.parts:
             continue
-        text = "".join(part.text or "" for part in event.content.parts)
-        if not text:
-            continue
+        # Skip text injected from file attachments; the attachment card already
+        # represents the file, so the extracted content isn't shown in the bubble.
+        text = "".join(
+            part.text or ""
+            for part in event.content.parts
+            if not is_attachment_text(part.text)
+        )
         role = "assistant" if event.content.role == "model" else "user"
-        messages.append({"role": role, "text": text})
+        attachments = attachments_by_event.get(event.id, []) if role == "user" else []
+        if not text and not attachments:
+            continue
+        messages.append(
+            {
+                "role": role,
+                "text": text,
+                "event_id": event.id,
+                "attachments": attachments,
+            }
+        )
 
     return {"messages": messages}
+
+
+def _load_attachments_by_event(conversation_id: str, user_id: str) -> dict[str, list[dict]]:
+    """Group a conversation's sent attachments by their linked ADK event id."""
+    client = get_supabase_service_client()
+    result = (
+        client.table("chat_attachments")
+        .select("*")
+        .eq("conversation_id", conversation_id)
+        .eq("user_id", user_id)
+        .not_.is_("adk_event_id", "null")
+        .order("created_at")
+        .execute()
+    )
+    grouped: dict[str, list[dict]] = {}
+    for row in result.data or []:
+        grouped.setdefault(row["adk_event_id"], []).append(
+            attachment_row_to_api(row)
+        )
+    return grouped
+
+
+@router.post("/conversations/{conversation_id}/attachments")
+async def upload_attachment(
+    conversation_id: str,
+    file: UploadFile = File(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> dict:
+    """Upload a file before sending; returns metadata + a preview URL.
+
+    The row is created unlinked (``adk_event_id`` is null) and is attached to a
+    message only when the user actually sends. Unsent rows can be deleted or
+    cleaned up later.
+    """
+    _get_owned_conversation(conversation_id, user.id)
+
+    data = await file.read()
+    mime_type = validate_upload_file(file, data)
+    filename = (file.filename or "").strip() or "upload"
+
+    attachment_id = new_attachment_id()
+    storage_path = build_storage_path(
+        user.id, conversation_id, attachment_id, filename, mime_type
+    )
+    upload_to_storage(storage_path, data, mime_type)
+
+    row = {
+        "id": attachment_id,
+        "conversation_id": conversation_id,
+        "user_id": user.id,
+        "storage_path": storage_path,
+        "filename": filename,
+        "mime_type": mime_type,
+        "size_bytes": len(data),
+    }
+    try:
+        get_supabase_service_client().table("chat_attachments").insert(row).execute()
+    except Exception:
+        delete_from_storage(storage_path)
+        raise
+
+    logger.info("Attachment uploaded", extra={"user_id": user.id})
+    return {**attachment_row_to_api(row, include_url=False), "url": create_signed_url(storage_path)}
+
+
+@router.delete("/conversations/{conversation_id}/attachments/{attachment_id}")
+async def delete_attachment(
+    conversation_id: str,
+    attachment_id: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> dict:
+    """Remove a not-yet-sent attachment (chip removed before sending)."""
+    _get_owned_conversation(conversation_id, user.id)
+
+    client = get_supabase_service_client()
+    result = (
+        client.table("chat_attachments")
+        .select("*")
+        .eq("id", attachment_id)
+        .eq("conversation_id", conversation_id)
+        .eq("user_id", user.id)
+        .is_("adk_event_id", "null")
+        .limit(1)
+        .execute()
+    )
+    rows = result.data or []
+    if not rows:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Attachment not found or already sent",
+        )
+
+    delete_from_storage(rows[0]["storage_path"])
+    client.table("chat_attachments").delete().eq("id", attachment_id).execute()
+    return {"ok": True}
 
 
 def _stream_error_message(exc: Exception, model_id: str) -> str:
@@ -203,8 +360,19 @@ async def send_message(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(exc),
         ) from exc
+
+    attachments = _fetch_pending_attachments(
+        conversation_id, user.id, body.attachment_ids
+    )
+    attachment_bytes = [
+        download_from_storage(row["storage_path"]) for row in attachments
+    ]
+    parts = build_user_message_parts(
+        body.text, attachments, attachment_bytes, model_id=model_id
+    )
+
     runner = get_runner(model_id)
-    new_message = types.Content(role="user", parts=[types.Part(text=body.text)])
+    new_message = types.Content(role="user", parts=parts)
 
     async def event_stream():
         streamed_any = False
@@ -231,7 +399,13 @@ async def send_message(
                     # send the aggregated text once.
                     yield _sse({"delta": text})
 
-            title = _persist_after_turn(conversation, conversation_id, body.text)
+            if attachments:
+                await _link_attachments_to_turn(
+                    conversation_id, user.id, attachments
+                )
+            title = _persist_after_turn(
+                conversation, conversation_id, body.text, attachments
+            )
             yield _sse({"done": True, "title": title})
         except Exception as exc:
             logger.exception(
@@ -255,12 +429,49 @@ async def send_message(
     )
 
 
-def _persist_after_turn(conversation: dict, conversation_id: str, user_text: str) -> str:
+async def _link_attachments_to_turn(
+    conversation_id: str, user_id: str, attachments: list[dict]
+) -> None:
+    """Stamp the just-persisted user event id onto this turn's attachments.
+
+    ADK appends one user event per turn; the last user event in the session is
+    the message we just sent, so we link the attachments to it.
+    """
+    session = await get_session_service().get_session(
+        app_name=APP_NAME, user_id=user_id, session_id=conversation_id
+    )
+    event_id = None
+    for event in reversed(session.events if session else []):
+        if event.content and event.content.role == "user":
+            event_id = event.id
+            break
+    if not event_id:
+        logger.warning(
+            "Could not find user event to link attachments",
+            extra={"user_id": user_id},
+        )
+        return
+
+    client = get_supabase_service_client()
+    client.table("chat_attachments").update({"adk_event_id": event_id}).in_(
+        "id", [row["id"] for row in attachments]
+    ).execute()
+
+
+def _persist_after_turn(
+    conversation: dict,
+    conversation_id: str,
+    user_text: str,
+    attachments: list[dict] | None = None,
+) -> str:
     """Update the conversation title (first turn) and bump updated_at."""
     current_title = conversation.get("title")
     new_title = current_title
     if not current_title or current_title == DEFAULT_TITLE:
-        new_title = _derive_title(user_text)
+        title_source = user_text.strip()
+        if not title_source and attachments:
+            title_source = attachments[0]["filename"]
+        new_title = _derive_title(title_source)
 
     # Any update fires the updated_at trigger, so the sidebar can order by recency.
     get_supabase_service_client().table("conversations").update(
@@ -311,8 +522,32 @@ async def delete_conversation(
             extra={"user_id": user.id},
         )
 
+    _delete_conversation_attachments(conversation_id, user.id)
+
     get_supabase_service_client().table("conversations").delete().eq(
         "id", conversation_id
     ).eq("user_id", user.id).execute()
 
     return {"ok": True}
+
+
+def _delete_conversation_attachments(conversation_id: str, user_id: str) -> None:
+    """Remove all stored objects for a conversation. Rows cascade with the row."""
+    client = get_supabase_service_client()
+    result = (
+        client.table("chat_attachments")
+        .select("storage_path")
+        .eq("conversation_id", conversation_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
+    paths = [row["storage_path"] for row in (result.data or [])]
+    if not paths:
+        return
+    try:
+        delete_from_storage(*paths)
+    except Exception:
+        logger.warning(
+            "Failed to delete some attachment objects",
+            extra={"user_id": user_id},
+        )

@@ -80,9 +80,11 @@ tests/
 | GET | `/health` | no | Liveness check -> `{"status": "ok"}` |
 | GET | `/api/v1/hello` | yes | Sample endpoint -> `{"message": "hello", "user_id": ...}` |
 | POST | `/api/v1/chat/conversations` | yes | Create a conversation (ADK session + metadata row) -> `{"id", "title"}` |
-| GET | `/api/v1/chat/conversations/{id}/messages` | yes | Load a conversation's history -> `{"messages": [{"role", "text"}]}` |
-| POST | `/api/v1/chat/conversations/{id}/messages` | yes | Send a message; streams the reply as SSE (`data: {"delta"|"done"|"error"}`) |
-| DELETE | `/api/v1/chat/conversations/{id}` | yes | Delete a conversation (ADK session + metadata row) -> `{"ok": true}` |
+| GET | `/api/v1/chat/conversations/{id}/messages` | yes | Load a conversation's history -> `{"messages": [{"role", "text", "event_id", "attachments"}]}` |
+| POST | `/api/v1/chat/conversations/{id}/messages` | yes | Send a message (optional `attachment_ids`); streams the reply as SSE (`data: {"delta"|"done"|"error"}`) |
+| POST | `/api/v1/chat/conversations/{id}/attachments` | yes | Upload a file (multipart) before sending -> `{"id", "filename", "mime_type", "size_bytes", "url"}` |
+| DELETE | `/api/v1/chat/conversations/{id}/attachments/{attachment_id}` | yes | Remove a not-yet-sent attachment -> `{"ok": true}` |
+| DELETE | `/api/v1/chat/conversations/{id}` | yes | Delete a conversation (ADK session + metadata row + stored files) -> `{"ok": true}` |
 
 ## Chatbot (ADK)
 
@@ -92,6 +94,7 @@ The chat feature is powered by [Google ADK](https://adk.dev). `agent/agent.py` d
 - **Isolation:** every session is keyed by the authenticated Supabase `user_id`; ownership of `conversations` rows is checked on each request. Metadata writes use the service-role client (`get_supabase_service_client`).
 - **Streaming:** `POST .../messages` runs the agent with `StreamingMode.SSE` and forwards partial text deltas to the browser as Server-Sent Events, followed by a terminal `{"done": true, "title": ...}` frame.
 - **MCP servers:** add `McpToolset(...)` entries to the agent's `tools` list in `agent/agent.py` to connect Model Context Protocol servers (none are wired up yet).
+- **File attachments:** files are uploaded before send to the private `chat-attachments` Supabase Storage bucket, tracked in the `chat_attachments` table, and linked to their ADK user event on send (`adk_event_id`). On send, the backend normalizes each file into GenAI `Part`s (`config/chat_attachments.py`, `agent/attachment_parts.py`): images and (for Gemini) PDFs are passed inline; other PDFs and text/code files are extracted to text so any provider can read them.
 
 ## Logging
 

@@ -584,6 +584,136 @@ body.chat-collapsed #root {
   cursor: not-allowed;
 }
 
+/* Attachments */
+.chat-composer-wrap {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.chat-composer-wrap .chat-composer {
+  border-top: none;
+}
+
+.chat-file-input {
+  display: none;
+}
+
+.chat-attach-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--text-h);
+  cursor: pointer;
+  align-self: flex-end;
+}
+
+.chat-attach-button:hover:not(:disabled) {
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+.chat-attach-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chat-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.6rem 0.75rem 0;
+}
+
+.chat-attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 220px;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--bg);
+  color: var(--text-h);
+  font-size: 13px;
+}
+
+.chat-attachment-chip.uploading {
+  opacity: 0.7;
+}
+
+.chat-attachment-chip.error {
+  border-color: #dc2626;
+  color: #dc2626;
+}
+
+.chat-attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-attachment-status {
+  opacity: 0.7;
+}
+
+.chat-attachment-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.chat-attachment-remove:hover {
+  opacity: 1;
+}
+
+.chat-message-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+
+.chat-message-image img {
+  max-width: 220px;
+  max-height: 220px;
+  border-radius: 0.5rem;
+  display: block;
+}
+
+.chat-file-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: 240px;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--bg);
+  color: var(--text-h);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.chat-file-card-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (max-width: 768px) {
   body.chat-half .chat-panel {
     width: 100vw;

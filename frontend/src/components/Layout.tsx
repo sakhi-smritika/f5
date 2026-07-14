@@ -77,7 +77,7 @@ function LayoutInner() {
       try {
         const profile = await getProfile(user.id)
         if (!cancelled) {
-          setDisplayName(profile?.full_name ?? profile?.display_name ?? null)
+          setDisplayName(profile?.display_name ?? profile?.full_name ?? null)
         }
       } catch {
         if (!cancelled) {

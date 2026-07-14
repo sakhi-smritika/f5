@@ -28,7 +28,8 @@ class FakeSessionService:
 
 
 class FakeEvent:
-    def __init__(self, text, *, partial, final, role="model"):
+    def __init__(self, text, *, partial, final, role="model", event_id=None):
+        self.id = event_id or "evt-1"
         self.content = SimpleNamespace(
             role=role, parts=[SimpleNamespace(text=text)]
         )
@@ -86,6 +87,19 @@ class FakeTable:
     def limit(self, *args, **kwargs):
         return self
 
+    def is_(self, *args, **kwargs):
+        return self
+
+    def in_(self, *args, **kwargs):
+        return self
+
+    def order(self, *args, **kwargs):
+        return self
+
+    @property
+    def not_(self):
+        return self
+
     def execute(self):
         if self._op == "select":
             return SimpleNamespace(data=self._select_data)
@@ -93,10 +107,13 @@ class FakeTable:
 
 
 class FakeSupabase:
-    def __init__(self, select_data):
+    def __init__(self, select_data, attachments_data=None):
         self.table_obj = FakeTable(select_data)
+        self.attachments_obj = FakeTable(attachments_data or [])
 
     def table(self, name):
+        if name == "chat_attachments":
+            return self.attachments_obj
         return self.table_obj
 
 
@@ -155,8 +172,12 @@ def test_get_messages_unknown_conversation_returns_404(client, patch_chat):
 def test_get_messages_maps_events(client, patch_chat):
     session = SimpleNamespace(
         events=[
-            FakeEvent("hi there", partial=False, final=True, role="user"),
-            FakeEvent("hello!", partial=False, final=True, role="model"),
+            FakeEvent(
+                "hi there", partial=False, final=True, role="user", event_id="u-1"
+            ),
+            FakeEvent(
+                "hello!", partial=False, final=True, role="model", event_id="m-1"
+            ),
         ]
     )
     patch_chat(
@@ -169,8 +190,18 @@ def test_get_messages_maps_events(client, patch_chat):
     assert response.status_code == 200
     assert response.json() == {
         "messages": [
-            {"role": "user", "text": "hi there"},
-            {"role": "assistant", "text": "hello!"},
+            {
+                "role": "user",
+                "text": "hi there",
+                "event_id": "u-1",
+                "attachments": [],
+            },
+            {
+                "role": "assistant",
+                "text": "hello!",
+                "event_id": "m-1",
+                "attachments": [],
+            },
         ]
     }
 
@@ -232,3 +263,89 @@ def test_send_message_rejects_unknown_model(client, patch_chat, monkeypatch):
     assert response.json() == {"ok": True}
     assert session_service.deleted == ["conv-1"]
     assert supabase.table_obj.deleted is True
+
+
+def _patch_storage(monkeypatch, *, download=b"hello from file"):
+    """Stub out Supabase Storage calls used by the attachment endpoints."""
+    import api.v1.chat as chat
+
+    monkeypatch.setattr(chat, "upload_to_storage", lambda *a, **k: None)
+    monkeypatch.setattr(chat, "delete_from_storage", lambda *a, **k: None)
+    monkeypatch.setattr(chat, "download_from_storage", lambda *a, **k: download)
+    monkeypatch.setattr(chat, "create_signed_url", lambda path: "https://signed/url")
+
+
+def test_upload_attachment_stores_and_returns_metadata(client, patch_chat, monkeypatch):
+    supabase = FakeSupabase(select_data=OWNED_ROW)
+    patch_chat(
+        session_service=FakeSessionService(session=SimpleNamespace(events=[])),
+        supabase=supabase,
+    )
+    _patch_storage(monkeypatch)
+
+    response = client.post(
+        "/api/v1/chat/conversations/conv-1/attachments",
+        files={"file": ("notes.txt", b"important notes", "text/plain")},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["filename"] == "notes.txt"
+    assert body["mime_type"] == "text/plain"
+    assert body["url"] == "https://signed/url"
+    # Row persisted unlinked (adk_event_id is set only on send).
+    inserted = supabase.attachments_obj.inserted[0]
+    assert inserted["conversation_id"] == "conv-1"
+    assert inserted["user_id"] == "test-user-id"
+    assert "adk_event_id" not in inserted
+
+
+def test_upload_attachment_rejects_unsupported_type(client, patch_chat, monkeypatch):
+    patch_chat(
+        session_service=FakeSessionService(session=SimpleNamespace(events=[])),
+        supabase=FakeSupabase(select_data=OWNED_ROW),
+    )
+    _patch_storage(monkeypatch)
+
+    response = client.post(
+        "/api/v1/chat/conversations/conv-1/attachments",
+        files={"file": ("evil.bin", b"\x00\x01\x02", "application/octet-stream")},
+    )
+
+    assert response.status_code == 422
+
+
+def test_send_message_with_attachment_links_event(client, patch_chat, monkeypatch):
+    attachment = {
+        "id": "att-1",
+        "conversation_id": "conv-1",
+        "user_id": "test-user-id",
+        "storage_path": "test-user-id/conv-1/att-1.txt",
+        "filename": "notes.txt",
+        "mime_type": "text/plain",
+        "size_bytes": 14,
+    }
+    user_event = FakeEvent(
+        "notes.txt", partial=False, final=True, role="user", event_id="user-evt-9"
+    )
+    supabase = FakeSupabase(select_data=OWNED_ROW, attachments_data=[attachment])
+    patch_chat(
+        session_service=FakeSessionService(
+            session=SimpleNamespace(events=[user_event])
+        ),
+        runner=FakeRunner(
+            [FakeEvent("Got it", partial=False, final=True)]
+        ),
+        supabase=supabase,
+    )
+    _patch_storage(monkeypatch)
+
+    response = client.post(
+        "/api/v1/chat/conversations/conv-1/messages",
+        json={"text": "summarize this", "attachment_ids": ["att-1"]},
+    )
+
+    assert response.status_code == 200
+    assert '"done": true' in response.text
+    # The attachment was stamped with the just-persisted user event id.
+    assert supabase.attachments_obj.updated[0] == {"adk_event_id": "user-evt-9"}

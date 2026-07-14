@@ -1,11 +1,46 @@
 import { useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
-import type { ChatMessage } from '../../lib/chat'
+import { FileText } from 'lucide-react'
+import type { ChatAttachment, ChatMessage } from '../../lib/chat'
 
 type MessageListProps = {
   messages: ChatMessage[]
   streaming: boolean
   error: string | null
+}
+
+function AttachmentView({ attachment }: { attachment: ChatAttachment }) {
+  const isImage = attachment.mime_type.startsWith('image/')
+  if (isImage && attachment.url) {
+    return (
+      <a
+        href={attachment.url}
+        target="_blank"
+        rel="noreferrer"
+        className="chat-message-image"
+      >
+        <img src={attachment.url} alt={attachment.filename} />
+      </a>
+    )
+  }
+  const content = (
+    <>
+      <FileText size={16} />
+      <span className="chat-file-card-name">{attachment.filename}</span>
+    </>
+  )
+  return attachment.url ? (
+    <a
+      href={attachment.url}
+      target="_blank"
+      rel="noreferrer"
+      className="chat-file-card"
+    >
+      {content}
+    </a>
+  ) : (
+    <div className="chat-file-card">{content}</div>
+  )
 }
 
 export function MessageList({ messages, streaming, error }: MessageListProps) {
@@ -38,7 +73,18 @@ export function MessageList({ messages, streaming, error }: MessageListProps) {
               ) : null}
             </div>
           ) : (
-            <div className="chat-message-text">{message.text}</div>
+            <>
+              {message.attachments && message.attachments.length > 0 ? (
+                <div className="chat-message-attachments">
+                  {message.attachments.map((attachment) => (
+                    <AttachmentView key={attachment.id} attachment={attachment} />
+                  ))}
+                </div>
+              ) : null}
+              {message.text ? (
+                <div className="chat-message-text">{message.text}</div>
+              ) : null}
+            </>
           )}
         </div>
       ))}

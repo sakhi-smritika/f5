@@ -1,5 +1,11 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { Paperclip, X } from 'lucide-react'
 import type { ChatModel } from '../../lib/models'
+import {
+  deleteAttachment,
+  uploadAttachment,
+  type ChatAttachment,
+} from '../../lib/chat'
 import { ModelSelector } from './ModelSelector'
 
 type ComposerProps = {
@@ -7,7 +13,16 @@ type ComposerProps = {
   models: ChatModel[]
   selectedModel: string
   onModelChange: (modelId: string) => void
-  onSend: (text: string) => void
+  onSend: (payload: { text: string; attachments: ChatAttachment[] }) => void
+  ensureConversation: () => Promise<string | null>
+}
+
+type PendingAttachment = {
+  localId: string
+  filename: string
+  status: 'uploading' | 'ready' | 'error'
+  attachment?: ChatAttachment
+  error?: string
 }
 
 function SendIcon() {
@@ -29,56 +44,178 @@ function SendIcon() {
   )
 }
 
+let localIdCounter = 0
+function nextLocalId(): string {
+  localIdCounter += 1
+  return `pending-${localIdCounter}`
+}
+
 export function Composer({
   disabled,
   models,
   selectedModel,
   onModelChange,
   onSend,
+  ensureConversation,
 }: ComposerProps) {
   const [text, setText] = useState('')
+  const [pending, setPending] = useState<PendingAttachment[]>([])
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const conversationIdRef = useRef<string | null>(null)
+
+  const uploading = pending.some((item) => item.status === 'uploading')
+  const readyAttachments = pending
+    .filter((item) => item.status === 'ready' && item.attachment)
+    .map((item) => item.attachment as ChatAttachment)
+
+  const handleFiles = async (selected: File[]) => {
+    if (selected.length === 0) {
+      return
+    }
+    const conversationId = await ensureConversation()
+    if (!conversationId) {
+      return
+    }
+    conversationIdRef.current = conversationId
+
+    for (const file of selected) {
+      const localId = nextLocalId()
+      setPending((prev) => [
+        ...prev,
+        { localId, filename: file.name, status: 'uploading' },
+      ])
+      try {
+        const attachment = await uploadAttachment(conversationId, file)
+        setPending((prev) =>
+          prev.map((item) =>
+            item.localId === localId
+              ? { ...item, status: 'ready', attachment }
+              : item,
+          ),
+        )
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Upload failed'
+        setPending((prev) =>
+          prev.map((item) =>
+            item.localId === localId
+              ? { ...item, status: 'error', error: message }
+              : item,
+          ),
+        )
+      }
+    }
+  }
+
+  const removePending = async (localId: string) => {
+    const target = pending.find((item) => item.localId === localId)
+    setPending((prev) => prev.filter((item) => item.localId !== localId))
+    const conversationId = conversationIdRef.current
+    if (target?.attachment && conversationId) {
+      try {
+        await deleteAttachment(conversationId, target.attachment.id)
+      } catch {
+        // Best-effort: orphaned uploads are cleaned up server-side later.
+      }
+    }
+  }
 
   const submit = () => {
     const trimmed = text.trim()
-    if (!trimmed || disabled) {
+    if (disabled || uploading) {
       return
     }
-    onSend(trimmed)
+    if (!trimmed && readyAttachments.length === 0) {
+      return
+    }
+    onSend({ text: trimmed, attachments: readyAttachments })
     setText('')
+    setPending([])
   }
 
+  const canSend =
+    !disabled && !uploading && (Boolean(text.trim()) || readyAttachments.length > 0)
+
   return (
-    <div className="chat-composer">
-      <textarea
-        className="chat-composer-input"
-        value={text}
-        placeholder="Send a message..."
-        rows={1}
-        onChange={(event) => setText(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' && !event.shiftKey) {
-            event.preventDefault()
-            submit()
-          }
-        }}
-      />
-      <div className="chat-composer-actions">
-        <ModelSelector
-          models={models}
-          value={selectedModel}
-          disabled={disabled}
-          onChange={onModelChange}
+    <div className="chat-composer-wrap">
+      {pending.length > 0 ? (
+        <div className="chat-attachments">
+          {pending.map((item) => (
+            <div
+              key={item.localId}
+              className={`chat-attachment-chip ${item.status}`}
+              title={item.error ?? item.filename}
+            >
+              <Paperclip size={14} />
+              <span className="chat-attachment-name">{item.filename}</span>
+              {item.status === 'uploading' ? (
+                <span className="chat-attachment-status">…</span>
+              ) : null}
+              <button
+                type="button"
+                className="chat-attachment-remove"
+                onClick={() => removePending(item.localId)}
+                aria-label={`Remove ${item.filename}`}
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="chat-composer">
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="chat-file-input"
+          onChange={(event) => {
+            const files = Array.from(event.target.files ?? [])
+            event.target.value = ''
+            void handleFiles(files)
+          }}
         />
         <button
           type="button"
-          className="chat-send"
-          disabled={disabled || !text.trim()}
-          onClick={submit}
-          aria-label="Send message"
-          title="Send"
+          className="chat-attach-button"
+          disabled={disabled}
+          onClick={() => fileInputRef.current?.click()}
+          aria-label="Attach files"
+          title="Attach files"
         >
-          <SendIcon />
+          <Paperclip size={20} />
         </button>
+        <textarea
+          className="chat-composer-input"
+          value={text}
+          placeholder="Send a message..."
+          rows={1}
+          onChange={(event) => setText(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+              event.preventDefault()
+              submit()
+            }
+          }}
+        />
+        <div className="chat-composer-actions">
+          <ModelSelector
+            models={models}
+            value={selectedModel}
+            disabled={disabled}
+            onChange={onModelChange}
+          />
+          <button
+            type="button"
+            className="chat-send"
+            disabled={!canSend}
+            onClick={submit}
+            aria-label="Send message"
+            title="Send"
+          >
+            <SendIcon />
+          </button>
+        </div>
       </div>
     </div>
   )
