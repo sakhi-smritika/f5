@@ -384,6 +384,15 @@ body.chat-collapsed #root {
   min-height: 0;
 }
 
+/* Wrap gives the toast a positioning context that spans the panel width. */
+.chat-messages-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .chat-messages {
   flex: 1;
   overflow-y: auto;
@@ -391,6 +400,72 @@ body.chat-collapsed #root {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+/* Toast: centered at the top of the chat panel, respects 50vw / fullscreen. */
+.chat-toast {
+  position: absolute;
+  top: 0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: var(--shadow);
+  pointer-events: none;
+  animation: chat-toast-in 0.15s ease-out;
+}
+
+@keyframes chat-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* Each message row stacks the copy button above its bubble. */
+.chat-message-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.chat-message-row.user {
+  align-items: flex-end;
+}
+
+.chat-message-row.assistant {
+  align-items: flex-start;
+}
+
+/* Copy button sits outside the bubble, centered on the panel width. */
+.chat-copy-button {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.chat-copy-button:hover {
+  border-color: var(--accent-border);
+  color: var(--accent);
 }
 
 .chat-empty-hint {
