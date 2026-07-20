@@ -4,6 +4,7 @@ Exposes the function to create the FastAPI application instance. To be used by m
 
 import logging
 import os
+import json
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
@@ -136,16 +137,25 @@ def create_app() -> FastAPI:
     
 
     app = FastAPI(title="My Sakhismritika Application", lifespan=lifespan)
-    environment = os.getenv("ENVIRONMENT", "local") 
-    cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
+    environment = os.getenv("ENVIRONMENT", "local")
+    raw_cors = os.getenv("CORS_ORIGINS", "http://localhost:5173")
+    try:
+        if raw_cors.strip().startswith("["):
+            cors_origins = json.loads(raw_cors)
+        else:
+            cors_origins = [o.strip() for o in raw_cors.split(",") if o.strip()]
+    except Exception:
+        cors_origins = [o.strip() for o in raw_cors.replace("[", "").replace("]", "").replace('"', "").split(",") if o.strip()]
+
     if environment == "local":
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=[origin.strip() for origin in cors_origins if origin.strip()],
+            allow_origins=[origin for origin in cors_origins],
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
         )
+        logger.info(f"Local environment detected. CORS origins set to: {cors_origins}")
     else:
         app.add_middleware(
             CORSMiddleware,
