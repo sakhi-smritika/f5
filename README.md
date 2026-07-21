@@ -1,6 +1,6 @@
 # Framework 5
 
-A personal-growth app. The current focus is an **Introspection** area with a **Diary** (free-text per day) and a **Day Log** (24 hourly slots per day).
+A personal-growth app. 
 
 ## Architecture
 
