@@ -139,7 +139,7 @@ def run_seed_script(module_name: str, file_path: str) -> bool:
 
 def main():
     """Main entry point for the seed script."""
-    print_header("Skolist Database Python Seed Scripts")
+    print_header("F5 Database Python Seed Scripts")
     
     print_info("This script runs Python seed scripts that create auth users and patch data.")
     print_info("Make sure you've run 'supabase db reset' first to apply SQL seeds.\n")
