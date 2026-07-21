@@ -7,20 +7,29 @@ without changing the underlying tool functions.
 
 from google.adk.tools import FunctionTool
 
-from .diary_tools import (
+from .introspection_tools.diary_tools import (
     get_day_log,
     get_diary_entry,
     get_recent_diary_entries,
     search_diary,
 )
-from .google_tools import (
-    complete_task,
+from .google_tools.calender_tools import (
     create_calendar_event,
-    create_task,
     list_calendar_events,
-    list_tasks,
 )
-from .goals_tools import get_goal, list_child_goals, list_my_goals, search_goals
+
+from .google_tools.tasks_tools import (
+    complete_task,
+    create_task,
+    list_tasks
+)
+
+from .goals_tools.goals_tools import (
+    get_goal,
+    list_child_goals,
+    list_my_goals,
+    search_goals
+)
 
 ALL_TOOLS: list[FunctionTool] = [
     FunctionTool(get_diary_entry),

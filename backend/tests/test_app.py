@@ -41,6 +41,25 @@ def test_unhandled_exception_returns_500(app):
     assert response.json() == {"detail": "Internal server error"}
 
 
+def test_create_app_runs_startup_checks_when_ping_enabled(monkeypatch, reset_logging):
+    import app
+
+    calls = []
+
+    class DummyPings:
+        @staticmethod
+        def ping_health():
+            calls.append("health")
+            return True
+
+    monkeypatch.setattr(app, "Pings", DummyPings)
+    monkeypatch.setattr(app, "PING", "true")
+
+    app.create_app()
+
+    assert calls == ["health"]
+
+
 def test_main_module_exposes_app(reset_logging):
     import main
 

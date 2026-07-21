@@ -8,7 +8,7 @@ JSON-serializable dicts so ADK can hand the result back to the model.
 
 from config.supabase import get_supabase_service_client
 
-from .context import require_user_id
+from ..context import require_user_id
 
 # Columns exposed to the assistant. ``user_id`` is intentionally omitted.
 _GOAL_COLUMNS = (
