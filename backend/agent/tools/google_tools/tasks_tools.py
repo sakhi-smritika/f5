@@ -7,8 +7,8 @@ False`` payload so the assistant can ask them to connect in Settings.
 """
 
 from ..context import require_user_id
-from .google_client import get_calendar_service, get_tasks_service
-from .utils import _parse_rfc3339
+from .google_client import get_tasks_service
+from .utils import parse_rfc3339, NOT_CONNECTED
 
 def list_tasks(show_completed: bool = False, max_results: int = 20) -> dict:
     """List tasks from the user's default Google Tasks list.
@@ -23,7 +23,7 @@ def list_tasks(show_completed: bool = False, max_results: int = 20) -> dict:
     user_id = require_user_id()
     service = get_tasks_service(user_id)
     if service is None:
-        return dict(_NOT_CONNECTED)
+        return dict(NOT_CONNECTED)
 
     safe_limit = max(1, min(int(max_results), 50))
     try:
@@ -67,7 +67,7 @@ def create_task(title: str, notes: str = "", due: str = "") -> dict:
     user_id = require_user_id()
     service = get_tasks_service(user_id)
     if service is None:
-        return dict(_NOT_CONNECTED)
+        return dict(NOT_CONNECTED)
 
     task_title = (title or "").strip()
     if not task_title:
@@ -81,7 +81,7 @@ def create_task(title: str, notes: str = "", due: str = "") -> dict:
         if len(due_text) == 10:
             body["due"] = f"{due_text}T00:00:00.000Z"
         else:
-            body["due"] = _parse_rfc3339(due_text)
+            body["due"] = parse_rfc3339(due_text)
 
     try:
         created = (
@@ -114,7 +114,7 @@ def complete_task(task_id: str) -> dict:
     user_id = require_user_id()
     service = get_tasks_service(user_id)
     if service is None:
-        return dict(_NOT_CONNECTED)
+        return dict(NOT_CONNECTED)
 
     task_id_text = (task_id or "").strip()
     if not task_id_text:

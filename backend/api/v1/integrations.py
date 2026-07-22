@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import RedirectResponse
 from google.auth.transport.requests import Request
 
-from agent.tools.google_client import (
+from agent.tools.google_tools.google_client import (
     delete_connection,
     get_connection,
     get_google_credentials,

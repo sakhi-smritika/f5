@@ -1,6 +1,13 @@
 from datetime import datetime, timezone
 
-def _parse_rfc3339(value: str) -> str:
+NOT_CONNECTED = {
+    "connected": False,
+    "message": (
+        "Google Workspace is not connected. Ask the user to open Settings and "
+        "click Connect Google to link their Calendar and Tasks."
+    ),
+}
+def parse_rfc3339(value: str) -> str:
     """Normalize an ISO/RFC3339 timestamp for the Google APIs."""
     text = (value or "").strip()
     if not text:

@@ -2,7 +2,7 @@ from fastapi import APIRouter
 
 from config.models import get_available_models, get_default_model_id
 
-router = APIRouter(prefix="/models", tags=["models"])
+router : APIRouter = APIRouter(prefix="/models", tags=["models"])
 
 
 @router.get("")

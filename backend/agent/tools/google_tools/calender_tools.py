@@ -10,15 +10,7 @@ from datetime import datetime, timedelta, timezone
 
 from ..context import require_user_id
 from .google_client import get_calendar_service
-from .utils import _parse_rfc3339
-
-_NOT_CONNECTED = {
-    "connected": False,
-    "message": (
-        "Google Workspace is not connected. Ask the user to open Settings and "
-        "click Connect Google to link their Calendar and Tasks."
-    ),
-}
+from .utils import parse_rfc3339, NOT_CONNECTED
 
 
 def _add_days(iso_date: str, delta: int) -> str:
@@ -28,9 +20,6 @@ def _add_days(iso_date: str, delta: int) -> str:
         days=delta
     )
     return shifted.strftime("%Y-%m-%d")
-
-
-
 
 
 def list_calendar_events(
@@ -51,7 +40,7 @@ def list_calendar_events(
     user_id = require_user_id()
     service = get_calendar_service(user_id)
     if service is None:
-        return dict(_NOT_CONNECTED)
+        return dict(NOT_CONNECTED)
 
     safe_limit = max(1, min(int(max_results), 50))
     try:
@@ -59,8 +48,8 @@ def list_calendar_events(
             service.events()
             .list(
                 calendarId="primary",
-                timeMin=_parse_rfc3339(time_min),
-                timeMax=_parse_rfc3339(time_max),
+                timeMin=parse_rfc3339(time_min),
+                timeMax=parse_rfc3339(time_max),
                 maxResults=safe_limit,
                 singleEvents=True,
                 orderBy="startTime",
@@ -110,7 +99,7 @@ def create_calendar_event(
     user_id = require_user_id()
     service = get_calendar_service(user_id)
     if service is None:
-        return dict(_NOT_CONNECTED)
+        return dict(NOT_CONNECTED)
 
     title = (summary or "").strip()
     if not title:
@@ -127,8 +116,8 @@ def create_calendar_event(
         start_body = {"date": start_text}
         end_body = {"date": end_date}
     else:
-        start_body = {"dateTime": _parse_rfc3339(start_text)}
-        end_body = {"dateTime": _parse_rfc3339(end_text)}
+        start_body = {"dateTime": parse_rfc3339(start_text)}
+        end_body = {"dateTime": parse_rfc3339(end_text)}
 
     body: dict = {
         "summary": title,

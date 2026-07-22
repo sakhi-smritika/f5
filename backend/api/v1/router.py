@@ -9,7 +9,7 @@ from config.auth import AuthenticatedUser, get_current_user
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(
+router : APIRouter = APIRouter(
     prefix="/api/v1",
     dependencies=[Depends(get_current_user)],
 )
