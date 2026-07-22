@@ -17,6 +17,10 @@ import time
 from pathlib import Path
 from typing import List, Tuple
 
+from dotenv import load_dotenv
+
+load_dotenv()  # Load environment variables from .env file if present
+
 # ANSI color codes for better terminal output
 class Colors:
     HEADER = '\033[95m'
