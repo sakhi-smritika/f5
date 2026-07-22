@@ -1,12 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
-import { Check, Copy, FileText } from 'lucide-react'
+import { Check, Copy, FileText, Quote } from 'lucide-react'
 import type { ChatAttachment, ChatMessage } from '../../lib/chat'
 
 type MessageListProps = {
   messages: ChatMessage[]
   streaming: boolean
   error: string | null
+  onQuote?: (text: string) => void
+}
+
+type QuoteButtonState = {
+  top: number
+  left: number
+  text: string
 }
 
 function AttachmentView({ attachment }: { attachment: ChatAttachment }) {
@@ -89,9 +96,12 @@ function CopyButton({
   )
 }
 
-export function MessageList({ messages, streaming, error }: MessageListProps) {
+export function MessageList({ messages, streaming, error, onQuote }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement | null>(null)
+  const wrapRef = useRef<HTMLDivElement | null>(null)
+  const scrollRef = useRef<HTMLDivElement | null>(null)
   const [showToast, setShowToast] = useState(false)
+  const [quoteButton, setQuoteButton] = useState<QuoteButtonState | null>(null)
   const toastTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -107,6 +117,63 @@ export function MessageList({ messages, streaming, error }: MessageListProps) {
     [],
   )
 
+  useEffect(() => {
+    const evaluateSelection = () => {
+      const selection = window.getSelection()
+      const wrap = wrapRef.current
+      if (!selection || selection.isCollapsed || selection.rangeCount === 0 || !wrap) {
+        setQuoteButton(null)
+        return
+      }
+      const text = selection.toString().trim()
+      if (!text) {
+        setQuoteButton(null)
+        return
+      }
+      const range = selection.getRangeAt(0)
+      const node = range.commonAncestorContainer
+      const element =
+        node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as Element | null)
+      const withinAssistant = element?.closest('.chat-message.assistant')
+      if (!withinAssistant) {
+        setQuoteButton(null)
+        return
+      }
+      const rect = range.getBoundingClientRect()
+      const wrapRect = wrap.getBoundingClientRect()
+      setQuoteButton({
+        top: rect.top - wrapRect.top - 8,
+        left: Math.min(
+          Math.max(rect.left - wrapRect.left + rect.width / 2, 28),
+          wrapRect.width - 28,
+        ),
+        text,
+      })
+    }
+
+    const handleMouseUp = () => window.setTimeout(evaluateSelection, 0)
+    document.addEventListener('mouseup', handleMouseUp)
+    return () => document.removeEventListener('mouseup', handleMouseUp)
+  }, [])
+
+  useEffect(() => {
+    const scroller = scrollRef.current
+    if (!scroller) {
+      return
+    }
+    const hide = () => setQuoteButton(null)
+    scroller.addEventListener('scroll', hide)
+    return () => scroller.removeEventListener('scroll', hide)
+  }, [])
+
+  const handleQuote = () => {
+    if (quoteButton && onQuote) {
+      onQuote(quoteButton.text)
+    }
+    window.getSelection()?.removeAllRanges()
+    setQuoteButton(null)
+  }
+
   const handleCopied = () => {
     setShowToast(true)
     if (toastTimerRef.current) {
@@ -116,14 +183,28 @@ export function MessageList({ messages, streaming, error }: MessageListProps) {
   }
 
   return (
-    <div className="chat-messages-wrap">
+    <div className="chat-messages-wrap" ref={wrapRef}>
       {showToast ? (
         <div className="chat-toast" role="status" aria-live="polite">
           Copied!
         </div>
       ) : null}
 
-      <div className="chat-messages">
+      {quoteButton ? (
+        <button
+          type="button"
+          className="chat-quote-button"
+          style={{ top: quoteButton.top, left: quoteButton.left }}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={handleQuote}
+          title="Quote in reply"
+          aria-label="Quote selection in reply"
+        >
+          <Quote size={15} />
+        </button>
+      ) : null}
+
+      <div className="chat-messages" ref={scrollRef}>
         {messages.length === 0 && !streaming ? (
           <p className="chat-empty-hint">Ask me anything to get started.</p>
         ) : null}

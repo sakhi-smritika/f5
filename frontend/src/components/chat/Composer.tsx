@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Paperclip, X } from 'lucide-react'
+import { CornerDownRight, Paperclip, X } from 'lucide-react'
 import type { ChatModel } from '../../lib/models'
 import {
   deleteAttachment,
@@ -15,6 +15,8 @@ type ComposerProps = {
   onModelChange: (modelId: string) => void
   onSend: (payload: { text: string; attachments: ChatAttachment[] }) => void
   ensureConversation: () => Promise<string | null>
+  quote?: string | null
+  onClearQuote?: () => void
 }
 
 type PendingAttachment = {
@@ -57,6 +59,8 @@ export function Composer({
   onModelChange,
   onSend,
   ensureConversation,
+  quote,
+  onClearQuote,
 }: ComposerProps) {
   const [text, setText] = useState('')
   const [pending, setPending] = useState<PendingAttachment[]>([])
@@ -127,9 +131,16 @@ export function Composer({
     if (!trimmed && readyAttachments.length === 0) {
       return
     }
-    onSend({ text: trimmed, attachments: readyAttachments })
+    const quoted = quote
+      ? `${quote
+          .split('\n')
+          .map((line) => `> ${line}`)
+          .join('\n')}\n\n`
+      : ''
+    onSend({ text: quoted + trimmed, attachments: readyAttachments })
     setText('')
     setPending([])
+    onClearQuote?.()
   }
 
   const canSend =
@@ -137,6 +148,21 @@ export function Composer({
 
   return (
     <div className="chat-composer-wrap">
+      {quote ? (
+        <div className="chat-quote-preview">
+          <CornerDownRight size={16} className="chat-quote-preview-icon" />
+          <span className="chat-quote-preview-text">{quote}</span>
+          <button
+            type="button"
+            className="chat-quote-preview-remove"
+            onClick={onClearQuote}
+            aria-label="Remove quote"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      ) : null}
+
       {pending.length > 0 ? (
         <div className="chat-attachments">
           {pending.map((item) => (

@@ -724,6 +724,43 @@ body.chat-collapsed #root {
   padding: 0;
   background: transparent;
   color: var(--text-h);
+  user-select: text;
+}
+
+/* Floating "quote selection" button, shown above a text selection. */
+.chat-quote-button {
+  position: absolute;
+  z-index: 40;
+  transform: translate(-50%, -100%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--bg);
+  color: var(--text-h);
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  animation: chat-quote-in 0.12s ease-out;
+}
+
+.chat-quote-button:hover {
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+@keyframes chat-quote-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-100% + 0.25rem));
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -100%);
+  }
 }
 
 .chat-message-text {
@@ -900,6 +937,55 @@ body.chat-collapsed #root {
 
 .chat-composer-wrap .chat-composer {
   border-top: none;
+}
+
+/* Quoted-selection preview above the input (ChatGPT reply style). */
+.chat-quote-preview {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0.6rem 0.75rem 0;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent-border);
+  border-radius: 0.5rem;
+  background: var(--accent-bg);
+}
+
+.chat-quote-preview-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--accent);
+}
+
+.chat-quote-preview-text {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-h);
+  font-size: 13px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.chat-quote-preview-remove {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.chat-quote-preview-remove:hover {
+  opacity: 1;
+  color: var(--text-h);
 }
 
 .chat-file-input {

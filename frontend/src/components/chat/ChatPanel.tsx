@@ -74,6 +74,7 @@ export function ChatPanel() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [models, setModels] = useState<ChatModel[]>([])
   const [selectedModel, setSelectedModel] = useState('')
+  const [quote, setQuote] = useState<string | null>(null)
 
   useEffect(() => {
     if (!user?.id) {
@@ -481,7 +482,12 @@ export function ChatPanel() {
           onClick={() => setSidebarOpen(false)}
         />
         <div className="chat-main">
-          <MessageList messages={messages} streaming={streaming} error={error} />
+          <MessageList
+            messages={messages}
+            streaming={streaming}
+            error={error}
+            onQuote={setQuote}
+          />
           <Composer
             disabled={streaming}
             models={models}
@@ -489,6 +495,8 @@ export function ChatPanel() {
             onModelChange={handleModelChange}
             onSend={handleSend}
             ensureConversation={ensureConversation}
+            quote={quote}
+            onClearQuote={() => setQuote(null)}
           />
         </div>
       </div>
