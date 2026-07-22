@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   BookOpen,
+  BookText,
   Brain,
   Icon,
   ListChecks,
@@ -143,6 +144,14 @@ function LayoutInner() {
             title="Goals"
           >
             <Icon iconNode={targetArrow} size={iconSize} aria-hidden="true" />
+          </NavLink>
+          <NavLink
+            to="/kbits"
+            className={({ isActive }) => (isActive ? 'icon-button active' : 'icon-button')}
+            aria-label="Knowledge Bits"
+            title="Knowledge Bits"
+          >
+            <BookText size={iconSize} aria-hidden="true" />
           </NavLink>
         </nav>
 

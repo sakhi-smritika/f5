@@ -1,0 +1,250 @@
+.kbits-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  text-align: left;
+  height: calc(100svh - var(--header-height));
+  min-height: 0;
+  overflow: hidden;
+}
+
+.kbits-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+
+.kbits-title {
+  margin: 0;
+  font-size: 32px;
+}
+
+.kbits-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.kbits-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--text-h);
+  cursor: pointer;
+}
+
+.kbits-icon-button:hover {
+  border-color: var(--accent-border);
+}
+
+.kbits-icon-button.active {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.kbits-icon-button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* While generating, keep the button lit and pulse the icon. */
+.kbits-icon-button.kbits-generating {
+  opacity: 1;
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.kbits-icon-button.kbits-generating svg {
+  animation: kbits-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes kbits-pulse {
+  0%,
+  100% {
+    transform: scale(0.82);
+    opacity: 0.65;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kbits-icon-button.kbits-generating svg {
+    animation: none;
+  }
+}
+
+.kbits-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--bg);
+  flex-shrink: 0;
+}
+
+.kbits-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1 1 8rem;
+}
+
+.kbits-option-label {
+  font-size: 13px;
+  color: var(--text-h);
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.kbits-option-input {
+  width: 100%;
+  padding: 0.45rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--bg);
+  color: var(--text-h);
+  font: inherit;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.kbits-feed {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  scroll-snap-type: y proximity;
+  padding-right: 0.35rem;
+}
+
+.kbits-card {
+  scroll-snap-align: start;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: min(70%, 32rem);
+  padding: 1.75rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--bg);
+  box-shadow: var(--shadow);
+  box-sizing: border-box;
+}
+
+.kbits-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  overflow-y: auto;
+}
+
+.kbits-card-title {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.25;
+  color: var(--text-h);
+}
+
+.kbits-card-content {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+.kbits-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.kbits-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--text-h);
+  cursor: pointer;
+}
+
+.kbits-action:hover {
+  border-color: var(--accent-border);
+}
+
+.kbits-action.active {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.kbits-action-danger {
+  margin-left: auto;
+}
+
+.kbits-action-danger:hover {
+  border-color: rgba(220, 38, 38, 0.5);
+  color: #dc2626;
+}
+
+.kbits-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 2rem 0;
+}
+
+.kbits-empty-text {
+  margin: 0;
+  font-size: 18px;
+  color: var(--text-h);
+}
+
+.kbits-empty-hint,
+.kbits-status {
+  margin: 0 0 0.5rem;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.kbits-error {
+  margin: 0;
+  color: #dc2626;
+  font-size: 14px;
+  flex-shrink: 0;
+}
