@@ -2,7 +2,7 @@ import logging
 
 from fastapi import APIRouter, Depends, Request
 
-from api.v1.chat import router as chat_router
+from api.v1.chat_api import router as chat_router
 from api.v1.integrations import router as integrations_router
 from api.v1.models import router as models_router
 from config.auth import AuthenticatedUser, get_current_user

@@ -122,16 +122,38 @@ OWNED_ROW = [{"id": "conv-1", "user_id": "test-user-id", "title": "New chat"}]
 
 @pytest.fixture
 def patch_chat(monkeypatch):
-    """Helper to install fakes into the chat module namespace."""
-    import api.v1.chat as chat
+    """Helper to install fakes into the chat API dependencies."""
 
     def apply(*, session_service=None, runner=None, supabase=None):
         if session_service is not None:
-            monkeypatch.setattr(chat, "get_session_service", lambda: session_service)
+            monkeypatch.setattr(
+                "api.v1.chat_api.conversations.get_session_service",
+                lambda: session_service,
+            )
+            monkeypatch.setattr(
+                "api.v1.chat_api.messages.get_session_service",
+                lambda: session_service,
+            )
+            monkeypatch.setattr(
+                "api.v1.chat_api.attachments.get_session_service",
+                lambda: session_service,
+            )
         if runner is not None:
-            monkeypatch.setattr(chat, "get_runner", lambda model_id=None: runner)
+            monkeypatch.setattr(
+                "api.v1.chat_api.messages.get_runner",
+                lambda model_id=None: runner,
+            )
         if supabase is not None:
-            monkeypatch.setattr(chat, "get_supabase_service_client", lambda: supabase)
+            for module in (
+                "api.v1.chat_api.access",
+                "api.v1.chat_api.conversations",
+                "api.v1.chat_api.attachments",
+                "api.v1.chat_api.folders",
+            ):
+                monkeypatch.setattr(
+                    f"{module}.get_supabase_service_client",
+                    lambda: supabase,
+                )
 
     return apply
 
@@ -267,12 +289,19 @@ def test_send_message_rejects_unknown_model(client, patch_chat, monkeypatch):
 
 def _patch_storage(monkeypatch, *, download=b"hello from file"):
     """Stub out Supabase Storage calls used by the attachment endpoints."""
-    import api.v1.chat as chat
-
-    monkeypatch.setattr(chat, "upload_to_storage", lambda *a, **k: None)
-    monkeypatch.setattr(chat, "delete_from_storage", lambda *a, **k: None)
-    monkeypatch.setattr(chat, "download_from_storage", lambda *a, **k: download)
-    monkeypatch.setattr(chat, "create_signed_url", lambda path: "https://signed/url")
+    monkeypatch.setattr(
+        "api.v1.chat_api.attachments.upload_to_storage", lambda *a, **k: None
+    )
+    monkeypatch.setattr(
+        "api.v1.chat_api.attachments.delete_from_storage", lambda *a, **k: None
+    )
+    monkeypatch.setattr(
+        "api.v1.chat_api.messages.download_from_storage", lambda *a, **k: download
+    )
+    monkeypatch.setattr(
+        "api.v1.chat_api.attachments.create_signed_url",
+        lambda path: "https://signed/url",
+    )
 
 
 def test_upload_attachment_stores_and_returns_metadata(client, patch_chat, monkeypatch):
