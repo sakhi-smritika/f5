@@ -659,7 +659,7 @@ body.chat-collapsed #root {
 }
 
 .chat-message-row.assistant {
-  align-items: flex-start;
+  align-items: stretch;
 }
 
 /* Copy button sits outside the bubble, centered on the panel width. */
@@ -683,6 +683,18 @@ body.chat-collapsed #root {
   color: var(--accent);
 }
 
+/* On assistant rows, show the copy action below the response, left-aligned. */
+.chat-message-row.assistant .chat-copy-button {
+  order: 2;
+  align-self: flex-start;
+}
+
+/* On user rows, show the copy action below the bubble, right-aligned. */
+.chat-message-row.user .chat-copy-button {
+  order: 2;
+  align-self: flex-end;
+}
+
 .chat-empty-hint {
   color: var(--text);
   font-size: 14px;
@@ -704,9 +716,13 @@ body.chat-collapsed #root {
   white-space: pre-wrap;
 }
 
+/* Assistant responses render full-width with no bubble (ChatGPT style). */
 .chat-message.assistant {
-  align-self: flex-start;
-  background: var(--code-bg);
+  align-self: stretch;
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
+  background: transparent;
   color: var(--text-h);
 }
 
