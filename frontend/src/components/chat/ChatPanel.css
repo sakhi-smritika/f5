@@ -71,6 +71,14 @@ body.chat-collapsed #root {
   cursor: pointer;
   font: inherit;
   padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chat-rail-logo {
+  flex-shrink: 0;
 }
 
 .chat-rail-label {
@@ -94,6 +102,13 @@ body.chat-collapsed #root {
 }
 
 .chat-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.chat-header-brand {
   display: flex;
   align-items: center;
   gap: 0.5rem;

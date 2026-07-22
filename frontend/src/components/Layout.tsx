@@ -15,6 +15,8 @@ import {
 import { targetArrow } from '@lucide/lab'
 import { useAuth } from '../context/AuthContext'
 import { getProfile } from '../lib/profile'
+import { APP_NAME } from '../lib/brand'
+import { AppLogo } from './AppLogo'
 import { ChatPanel } from './chat/ChatPanel'
 import { ChatUIProvider, useChatUI } from './chat/ChatUIContext'
 import './Layout.css'
@@ -98,6 +100,9 @@ function LayoutInner() {
   return (
     <>
       <header className="layout-header">
+        <NavLink to="/introspection/diary" className="layout-brand" aria-label={APP_NAME} title={APP_NAME}>
+          <AppLogo size={28} />
+        </NavLink>
         <nav className="pane-nav">
           <div className="pane-category" ref={introspectionRef}>
             <button
@@ -147,8 +152,8 @@ function LayoutInner() {
             type="button"
             className="icon-button chat-open-button"
             onClick={() => setMode('full')}
-            aria-label="Open Sakhi Smritika"
-            title="Open Sakhi Smritika"
+            aria-label={`Open ${APP_NAME}`}
+            title={`Open ${APP_NAME}`}
           >
             <MessageCircle size={iconSize} aria-hidden="true" />
           </button>

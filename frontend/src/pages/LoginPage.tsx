@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { AppLogo } from '../components/AppLogo'
+import { APP_NAME } from '../lib/brand'
 import './LoginPage.css'
 
 export function LoginPage() {
@@ -32,8 +34,11 @@ export function LoginPage() {
   return (
     <main className="login-page">
       <section className="login-card">
-        <h1>Sign in</h1>
-        <p>Use your Supabase account to access the app.</p>
+        <div className="login-brand">
+          <AppLogo size={56} />
+          <h1>{APP_NAME}</h1>
+        </div>
+        <p className="login-subtitle">Sign in to continue</p>
         <form onSubmit={handleSubmit}>
           <label htmlFor="email">Email</label>
           <input

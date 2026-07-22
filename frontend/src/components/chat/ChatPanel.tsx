@@ -28,6 +28,8 @@ import {
 import { Composer } from './Composer'
 import { ConversationList } from './ConversationList'
 import { MessageList } from './MessageList'
+import { AppLogo } from '../AppLogo'
+import { APP_NAME } from '../../lib/brand'
 import { useChatUI } from './ChatUIContext'
 import './ChatPanel.css'
 
@@ -400,9 +402,10 @@ export function ChatPanel() {
           type="button"
           className="chat-rail-button"
           onClick={() => setMode('half')}
-          title="Open Sakhi Smritika"
+          title={`Open ${APP_NAME}`}
         >
-          <span className="chat-rail-label">Sakhi Smritika</span>
+          <AppLogo size={28} className="chat-rail-logo" />
+          <span className="chat-rail-label">{APP_NAME}</span>
         </button>
       </aside>,
       document.body,
@@ -423,7 +426,10 @@ export function ChatPanel() {
           >
             <MenuIcon />
           </button>
-          <span className="chat-header-title">Sakhi Smritika</span>
+          <span className="chat-header-brand">
+            <AppLogo size={24} />
+            <span className="chat-header-title">{APP_NAME}</span>
+          </span>
         </div>
         <div className="chat-header-actions">
           <button
