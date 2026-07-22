@@ -5,74 +5,88 @@ DO NOT CHANGE THE EMAIL OR PASSWORD of the seeded users, as they are used in oth
 """
 
 import logging
-from .utils import get_admin_client
+from typing import Any
+
+from .data.users import SEED_USERS
+from .utils import get_admin_client, get_user_id_by_email, list_auth_users
 
 logger = logging.getLogger(__name__)
 
-# Dummy users to seed
-SEED_USERS = [
-    {
-        "email": "seed_user@gmail.com",
-        "password": "password123",
-        "user_metadata": {"name": "Seed User"},
-    },
-    {
-        "email": "test@example.com",
-        "password": "password123",
-        "user_metadata": {"name": "Test User"},
-    },
-]
+
+def get_existing_user_emails(users: list[Any]) -> set[str]:
+    """Return emails for the given auth user records."""
+    return {
+        getattr(user, "email", None)
+        for user in users
+        if getattr(user, "email", None)
+    }
 
 
-def get_existing_user_emails(supabase) -> set[str]:
-    """Return all existing user emails from Supabase auth."""
-    try:
-        response = supabase.auth.admin.list_users()
-        users = getattr(response, "users", None) or []
-        logger.info(f"Found {len(users)} existing users in Supabase auth.")
-        logger.debug(f"Existing users: {[getattr(user, 'email', None) for user in users]}")
-        return {
-            getattr(user, "email", None)
-            for user in users
-            if getattr(user, "email", None)
-        }
-    except Exception as exc:
-        logger.error(f"⚠ Could not list existing users: {exc}")
-        return set()
+def upsert_public_user_profile(supabase, user_id: str, profile: dict[str, str]) -> None:
+    """Write profile fields into public.users for the given auth user id."""
+    row = {
+        "id": user_id,
+        "username": profile.get("username"),
+        "display_name": profile.get("display_name"),
+        "full_name": profile.get("full_name"),
+        "user_information": profile.get("user_information"),
+        "system_instructions": profile.get("system_instructions"),
+    }
+    supabase.table("users").upsert(row, on_conflict="id").execute()
 
 
 def seed_users():
-    """Seed dummy users into Supabase auth."""
+    """Seed dummy users into Supabase auth and public.users profiles."""
     supabase = get_admin_client()
-    existing_emails = get_existing_user_emails(supabase)
+    auth_users = list_auth_users(supabase)
+    existing_emails = get_existing_user_emails(auth_users)
 
-    logger.info(f"Seeding {len(SEED_USERS)} users...")
+    logger.info("Seeding %s users...", len(SEED_USERS))
 
     for user_data in SEED_USERS:
         email = user_data["email"]
-        if email in existing_emails:
-            logger.info(f"↺ User already exists: {email}")
+        profile = user_data.get("profile", {})
+        user_id = get_user_id_by_email(supabase, email)
+
+        if email in existing_emails and user_id:
+            logger.info("User already exists: %s", email)
+        else:
+            try:
+                response = supabase.auth.admin.create_user(
+                    {
+                        "email": email,
+                        "password": user_data["password"],
+                        "email_confirm": True,
+                        "user_metadata": user_data.get("user_metadata", {}),
+                    }
+                )
+                user_id = str(response.user.id)
+                auth_users.append(response.user)
+                existing_emails.add(email)
+                logger.info("Created user: %s (ID: %s)", email, user_id)
+            except Exception as exc:
+                error_msg = str(exc)
+                if "already been registered" in error_msg or "already exists" in error_msg:
+                    logger.warning("User already exists: %s", email)
+                    existing_emails.add(email)
+                    user_id = get_user_id_by_email(supabase, email)
+                else:
+                    logger.error("Failed to create user %s: %s", email, error_msg)
+                    continue
+
+        if not user_id:
+            logger.error("Could not resolve user id for %s; skipping profile seed.", email)
             continue
 
         try:
-            # Use admin API to create user (bypasses email confirmation)
-            response = supabase.auth.admin.create_user(
-                {
-                    "email": email,
-                    "password": user_data["password"],
-                    "email_confirm": True,  # Auto-confirm email
-                    "user_metadata": user_data.get("user_metadata", {}),
-                }
+            upsert_public_user_profile(supabase, user_id, profile)
+            logger.info(
+                "Updated public.users profile for %s (display_name=%s)",
+                email,
+                profile.get("display_name"),
             )
-            logger.info(f"✓ Created user: {email} (ID: {response.user.id})")
-            existing_emails.add(email)
-        except Exception as e:
-            error_msg = str(e)
-            if "already been registered" in error_msg or "already exists" in error_msg:
-                logger.warning(f"⚠ User already exists: {email}")
-                existing_emails.add(email)
-            else:
-                logger.error(f"✗ Failed to create user {email}: {error_msg}")
+        except Exception as exc:
+            logger.error("Failed to seed profile for %s: %s", email, exc)
 
     logger.info("\nSeeding complete!")
 

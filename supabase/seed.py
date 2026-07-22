@@ -107,6 +107,10 @@ def run_seed_script(module_name: str, file_path: str) -> bool:
         # Determine the main function to call based on the module name
         if "seed_users" in module_name:
             main_func = getattr(module, "seed_users", None)
+        elif "seed_diary" in module_name:
+            main_func = getattr(module, "seed_diary", None)
+        elif "seed_goals" in module_name:
+            main_func = getattr(module, "seed_goals", None)
         elif "seed_activities" in module_name:
             main_func = getattr(module, "seed_activity", None)
         else:
@@ -115,7 +119,9 @@ def run_seed_script(module_name: str, file_path: str) -> bool:
         
         if not main_func:
             print_error(f"No main function found in {module_name}")
-            print_info("Expected function names: seed_users, seed_activity, main, or seed")
+            print_info(
+                "Expected function names: seed_users, seed_diary, seed_goals, seed_activity, main, or seed"
+            )
             return False
         
         # Run the seed function

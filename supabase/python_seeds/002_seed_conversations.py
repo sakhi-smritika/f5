@@ -26,44 +26,16 @@ from google.adk.runners import Runner
 from google.adk.sessions import DatabaseSessionService
 from google.genai import types as genai_types
 
-from .utils import get_admin_client
+from .data.conversations import (
+    APP_NAME,
+    DEFAULT_MODEL,
+    SAMPLE_CONVERSATIONS,
+    SYSTEM_INSTRUCTION,
+)
+from .data.users import seed_user_emails
+from .utils import get_admin_client, resolve_user_ids_by_emails
 
 logger = logging.getLogger(__name__)
-
-SEED_USERS = [
-    {
-        "email": "seed_user@gmail.com",
-        "password": "password123",
-        "user_metadata": {"name": "Seed User"},
-    },
-    {
-        "email": "test@example.com",
-        "password": "password123",
-        "user_metadata": {"name": "Test User"},
-    },
-]
-
-DEFAULT_USER_EMAILS = [user_data["email"] for user_data in SEED_USERS]
-
-SAMPLE_CONVERSATIONS = [
-    {
-        "title": "Morning reflection",
-        "user_text": "Help me reflect on my day and pick one thing to improve tomorrow.",
-    },
-    {
-        "title": "Weekly goals",
-        "user_text": "I want to build a better weekly plan for my goals.",
-    },
-]
-
-APP_NAME = "f5-chat"
-DEFAULT_MODEL = "gpt-4o-mini"
-
-SYSTEM_INSTRUCTION = (
-    "You are a helpful, concise assistant embedded in a personal-growth web app. "
-    "Be practical and encouraging. Use Markdown (lists, code blocks, bold) when it "
-    "improves clarity, and keep answers focused."
-)
 
 
 def get_openai_api_key() -> str:
@@ -74,9 +46,8 @@ def get_openai_api_key() -> str:
     return api_key
 
 
-
 def get_session_service() -> DatabaseSessionService:
-    database_url = os.getenv("DATABASE_URL", "")
+    database_url = os.getenv("DATABASE_URL", "").strip()
     if not database_url:
         raise RuntimeError(
             "DATABASE_URL is required to run the ADK session seed flow."
@@ -93,7 +64,7 @@ def build_agent() -> LlmAgent:
         ),
         name="assistant",
         instruction=SYSTEM_INSTRUCTION,
-        tools=[],  # No tools for seeding
+        tools=[],
     )
 
 
@@ -112,58 +83,47 @@ async def prepare_session_tables(session_service: DatabaseSessionService) -> Non
 
 def resolve_user_ids(admin_client: Any) -> list[str]:
     """Resolve seed user IDs from Supabase auth."""
-    response = admin_client.auth.admin.list_users()
-    users = response if isinstance(response, list) else getattr(response, "users", None) or []
-    logger.info(f"Found {len(users)} users in Supabase auth for seeding conversations")
-    matched_ids: list[str] = []
-    for user in users:
-        email = getattr(user, "email", None)
-        if email in DEFAULT_USER_EMAILS:
-            logger.info(f"Found user {email} with ID {user.id} for seeding conversations")
-            matched_ids.append(str(user.id))
-        else:
-            logger.debug(f"Skipping user {email} with ID {user.id} for seeding conversations")
+    user_ids_by_email = resolve_user_ids_by_emails(admin_client, seed_user_emails())
+    logger.info(
+        "Found %s seed user(s) in Supabase auth for conversation seeding",
+        len(user_ids_by_email),
+    )
+    for email, user_id in user_ids_by_email.items():
+        logger.info("Resolved %s -> %s", email, user_id)
 
-    if matched_ids:
-        return matched_ids
+    if user_ids_by_email:
+        return list(user_ids_by_email.values())
 
     raise RuntimeError("No Supabase users were found to attach seeded conversations to.")
 
 
 def create_conversation(client: Any, *, user_id: str, title: str) -> str:
     """Create a conversation metadata row in Supabase."""
-    try:
-        conversation_id = str(uuid.uuid4())
-        client.table("conversations").insert(
-            {"id": conversation_id, "user_id": user_id, "title": title}
-        ).execute()
-        logger.info(
-            f"✓ Created conversation {conversation_id} for user {user_id} with title '{title}'"
-        )
-        return conversation_id
-    except Exception as exc:
-        logger.error(f"⚠ Could not create conversation for user {user_id}: {exc}")
-        raise
+    conversation_id = str(uuid.uuid4())
+    client.table("conversations").insert(
+        {"id": conversation_id, "user_id": user_id, "title": title}
+    ).execute()
+    logger.info(
+        "Created conversation %s for user %s with title '%s'",
+        conversation_id,
+        user_id,
+        title,
+    )
+    return conversation_id
 
 
 def conversation_exists(client: Any, *, user_id: str, title: str) -> bool:
     """Check if a conversation with the given title already exists for the user."""
-    try:
-        response = (
-            client.table("conversations")
-            .select("id")
-            .eq("user_id", user_id)
-            .eq("title", title)
-            .limit(1)
-            .execute()
-        )
-        rows = getattr(response, "data", None) or []
-        return bool(rows)
-    except Exception as exc:
-        logger.error(
-            f"⚠ Could not check if conversation exists for user {user_id}: {exc}"
-        )
-        raise
+    response = (
+        client.table("conversations")
+        .select("id")
+        .eq("user_id", user_id)
+        .eq("title", title)
+        .limit(1)
+        .execute()
+    )
+    rows = getattr(response, "data", None) or []
+    return bool(rows)
 
 
 async def seed_conversation_with_agent(
@@ -173,12 +133,7 @@ async def seed_conversation_with_agent(
     user_id: str,
     sample: dict[str, str],
 ) -> None:
-    """
-    Create a conversation and seed it with a user message and an LLM-generated response.
-
-    This uses the Runner (LlmAgent + DatabaseSessionService) to properly execute
-    the agent, which automatically persists both user and assistant messages.
-    """
+    """Create a conversation and seed it with a user message and LLM response."""
     title = sample["title"]
     user_text = sample["user_text"]
 
@@ -188,70 +143,56 @@ async def seed_conversation_with_agent(
 
     conversation_id = create_conversation(client, user_id=user_id, title=title)
 
-    # Create the ADK session for this conversation
     await runner.session_service.create_session(
         app_name=APP_NAME, user_id=user_id, session_id=conversation_id
     )
 
-    # Execute the agent via runner.run_async(), which persists both messages automatically
-    try:
-        new_message = genai_types.Content(
-            role="user",
-            parts=[genai_types.Part(text=user_text)],
-        )
-        async for event in runner.run_async(
-            user_id=user_id,
-            session_id=conversation_id,
-            new_message=new_message,
-            run_config=RunConfig(),
-        ):
-            # Events are automatically persisted by the runner.
-            # We just consume them here to ensure the full run completes.
-            pass
+    new_message = genai_types.Content(
+        role="user",
+        parts=[genai_types.Part(text=user_text)],
+    )
+    async for _event in runner.run_async(
+        user_id=user_id,
+        session_id=conversation_id,
+        new_message=new_message,
+        run_config=RunConfig(),
+    ):
+        pass
 
-        print(
-            f"✓ Seeded conversation {conversation_id} for user {user_id} with title '{title}'"
-        )
-    except Exception as exc:
-        logger.exception(
-            f"Failed to seed conversation {conversation_id}",
-            extra={"user_id": user_id, "title": title},
-        )
-        raise
+    print(
+        f"✓ Seeded conversation {conversation_id} for user {user_id} with title '{title}'"
+    )
 
 
 async def seed_conversations() -> None:
-    """Main seeding function: create conversations and seed them with agent responses."""
-    try:
-        admin_client = get_admin_client()
-        service_client = get_admin_client()
-        session_service = get_session_service()
+    """Create conversations and seed them with agent responses."""
+    admin_client = get_admin_client()
+    session_service = get_session_service()
 
-        await prepare_session_tables(session_service)
+    await prepare_session_tables(session_service)
+    runner = get_runner()
+    user_ids = resolve_user_ids(admin_client)
 
-        # Get or create the runner (wires agent to session service)
-        runner = get_runner()
+    print(f"Found {len(user_ids)} user(s) for seeding conversations")
 
-        user_ids = resolve_user_ids(admin_client)
-        print(f"Found {len(user_ids)} user(s) for seeding conversations")
+    for user_id in user_ids:
+        for sample in SAMPLE_CONVERSATIONS:
+            await seed_conversation_with_agent(
+                runner,
+                admin_client,
+                user_id=user_id,
+                sample=sample,
+            )
 
-        for user_id in user_ids:
-            for sample in SAMPLE_CONVERSATIONS:
-                await seed_conversation_with_agent(
-                    runner,
-                    service_client,
-                    user_id=user_id,
-                    sample=sample,
-                )
-
-        print("✓ Conversation seeding complete")
-    except Exception as exc:
-        logger.exception("Conversation seeding failed")
-        sys.exit(1)
+    print("✓ Conversation seeding complete")
 
 
 def main() -> None:
-    asyncio.run(seed_conversations())
+    try:
+        asyncio.run(seed_conversations())
+    except Exception:
+        logger.exception("Conversation seeding failed")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
