@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { CornerDownRight, Paperclip, X } from 'lucide-react'
 import type { ChatModel } from '../../lib/models'
 import {
@@ -65,7 +65,17 @@ export function Composer({
   const [text, setText] = useState('')
   const [pending, setPending] = useState<PendingAttachment[]>([])
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const conversationIdRef = useRef<string | null>(null)
+
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current
+    if (!textarea) {
+      return
+    }
+    textarea.style.height = 'auto'
+    textarea.style.height = `${textarea.scrollHeight}px`
+  }, [text])
 
   const uploading = pending.some((item) => item.status === 'uploading')
   const readyAttachments = pending
@@ -212,6 +222,7 @@ export function Composer({
           <Paperclip size={20} />
         </button>
         <textarea
+          ref={textareaRef}
           className="chat-composer-input"
           value={text}
           placeholder="Send a message..."

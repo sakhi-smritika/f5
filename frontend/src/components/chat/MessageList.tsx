@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { Check, Copy, FileText, Quote } from 'lucide-react'
 import type { ChatAttachment, ChatMessage } from '../../lib/chat'
 
@@ -235,7 +236,16 @@ export function MessageList({ messages, streaming, error, onQuote }: MessageList
               >
                 {message.role === 'assistant' ? (
                   <div className="chat-markdown">
-                    <ReactMarkdown>{message.text}</ReactMarkdown>
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        a: ({ node, ...props }) => (
+                          <a {...props} target="_blank" rel="noreferrer noopener" />
+                        ),
+                      }}
+                    >
+                      {message.text}
+                    </ReactMarkdown>
                     {streaming && isLast ? (
                       <span className="chat-cursor" />
                     ) : null}
