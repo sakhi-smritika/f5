@@ -50,6 +50,12 @@ DEFAULT_TITLE = "New chat"
 
 class CreateConversationBody(BaseModel):
     title: str | None = None
+    folder_id: str | None = None
+
+
+class UpdateConversationBody(BaseModel):
+    title: str | None = None
+    folder_id: str | None = None
 
 
 class SendMessageBody(BaseModel):
@@ -66,10 +72,6 @@ class SendMessageBody(BaseModel):
     client_location: str | None = None
 
 
-class RenameConversationBody(BaseModel):
-    title: str
-
-
 def _derive_title(text: str) -> str:
     """Build a short conversation title from the first user message."""
     first_line = text.strip().splitlines()[0] if text.strip() else DEFAULT_TITLE
@@ -77,6 +79,25 @@ def _derive_title(text: str) -> str:
     if len(first_line) > 40:
         return first_line[:40].rstrip() + "..."
     return first_line or DEFAULT_TITLE
+
+
+def _get_owned_folder(folder_id: str, user_id: str) -> dict:
+    """Fetch a folder row, enforcing ownership. Raises 404 otherwise."""
+    client = get_supabase_service_client()
+    result = (
+        client.table("chat_folder")
+        .select("*")
+        .eq("id", folder_id)
+        .eq("user_id", user_id)
+        .limit(1)
+        .execute()
+    )
+    rows = result.data or []
+    if not rows:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found"
+        )
+    return rows[0]
 
 
 def _get_owned_conversation(conversation_id: str, user_id: str) -> dict:
@@ -172,16 +193,21 @@ async def create_conversation(
     conversation_id = str(uuid.uuid4())
     title = (body.title or DEFAULT_TITLE).strip() or DEFAULT_TITLE
 
+    if body.folder_id:
+        _get_owned_folder(body.folder_id, user.id)
+
     await get_session_service().create_session(
         app_name=APP_NAME, user_id=user.id, session_id=conversation_id
     )
 
-    get_supabase_service_client().table("conversations").insert(
-        {"id": conversation_id, "user_id": user.id, "title": title}
-    ).execute()
+    row = {"id": conversation_id, "user_id": user.id, "title": title}
+    if body.folder_id:
+        row["folder_id"] = body.folder_id
+
+    get_supabase_service_client().table("conversations").insert(row).execute()
 
     logger.info("Conversation created", extra={"user_id": user.id})
-    return {"id": conversation_id, "title": title}
+    return {"id": conversation_id, "title": title, "folder_id": body.folder_id}
 
 
 @router.get("/conversations/{conversation_id}/messages")
@@ -482,26 +508,45 @@ def _persist_after_turn(
 
 
 @router.patch("/conversations/{conversation_id}")
-async def rename_conversation(
+async def update_conversation(
     conversation_id: str,
-    body: RenameConversationBody,
+    body: UpdateConversationBody,
     user: AuthenticatedUser = Depends(get_current_user),
 ) -> dict:
-    """Rename a conversation's sidebar title."""
+    """Rename a conversation and/or move it to a folder."""
     _get_owned_conversation(conversation_id, user.id)
 
-    title = body.title.strip()
-    if not title:
+    updates: dict = {}
+    if body.title is not None:
+        title = body.title.strip()
+        if not title:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Title cannot be empty",
+            )
+        updates["title"] = title
+
+    if "folder_id" in body.model_fields_set:
+        if body.folder_id:
+            _get_owned_folder(body.folder_id, user.id)
+        updates["folder_id"] = body.folder_id
+
+    if not updates:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Title cannot be empty",
+            detail="No updates provided",
         )
 
-    get_supabase_service_client().table("conversations").update(
-        {"title": title}
-    ).eq("id", conversation_id).eq("user_id", user.id).execute()
+    get_supabase_service_client().table("conversations").update(updates).eq(
+        "id", conversation_id
+    ).eq("user_id", user.id).execute()
 
-    return {"id": conversation_id, "title": title}
+    result = {"id": conversation_id}
+    if "title" in updates:
+        result["title"] = updates["title"]
+    if "folder_id" in updates:
+        result["folder_id"] = updates["folder_id"]
+    return result
 
 
 @router.delete("/conversations/{conversation_id}")
@@ -511,24 +556,53 @@ async def delete_conversation(
 ) -> dict:
     """Delete a conversation (ADK session + metadata row)."""
     _get_owned_conversation(conversation_id, user.id)
+    await _delete_conversation_fully(conversation_id, user.id)
+    return {"ok": True}
 
+
+@router.delete("/folders/{folder_id}")
+async def delete_folder(
+    folder_id: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> dict:
+    """Delete a folder and all conversations inside it."""
+    _get_owned_folder(folder_id, user.id)
+
+    client = get_supabase_service_client()
+    result = (
+        client.table("conversations")
+        .select("id")
+        .eq("folder_id", folder_id)
+        .eq("user_id", user.id)
+        .execute()
+    )
+    for row in result.data or []:
+        await _delete_conversation_fully(row["id"], user.id)
+
+    client.table("chat_folder").delete().eq("id", folder_id).eq(
+        "user_id", user.id
+    ).execute()
+
+    return {"ok": True}
+
+
+async def _delete_conversation_fully(conversation_id: str, user_id: str) -> None:
+    """Remove ADK session, attachments, and metadata for one conversation."""
     try:
         await get_session_service().delete_session(
-            app_name=APP_NAME, user_id=user.id, session_id=conversation_id
+            app_name=APP_NAME, user_id=user_id, session_id=conversation_id
         )
     except Exception:
         logger.warning(
             "Failed to delete ADK session; removing metadata anyway",
-            extra={"user_id": user.id},
+            extra={"user_id": user_id},
         )
 
-    _delete_conversation_attachments(conversation_id, user.id)
+    _delete_conversation_attachments(conversation_id, user_id)
 
     get_supabase_service_client().table("conversations").delete().eq(
         "id", conversation_id
-    ).eq("user_id", user.id).execute()
-
-    return {"ok": True}
+    ).eq("user_id", user_id).execute()
 
 
 def _delete_conversation_attachments(conversation_id: str, user_id: str) -> None:

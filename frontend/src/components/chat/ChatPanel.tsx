@@ -4,12 +4,18 @@ import { Maximize2, Minimize2, PanelRightClose, X } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import {
   createConversation,
+  createFolder,
   deleteConversation,
+  deleteFolder,
   listConversations,
+  listFolders,
   loadMessages,
+  moveConversationToFolder,
   renameConversation,
+  renameFolder,
   streamMessage,
   type ChatAttachment,
+  type ChatFolder,
   type ChatMessage,
   type Conversation,
 } from '../../lib/chat'
@@ -57,6 +63,8 @@ export function ChatPanel() {
   const { user } = useAuth()
   const { mode, setMode } = useChatUI()
   const [conversations, setConversations] = useState<Conversation[]>([])
+  const [folders, setFolders] = useState<ChatFolder[]>([])
+  const [expandedFolderIds, setExpandedFolderIds] = useState<Set<string>>(new Set())
   const [activeId, setActiveId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [streaming, setStreaming] = useState(false)
@@ -70,15 +78,17 @@ export function ChatPanel() {
       return
     }
     let cancelled = false
-    listConversations()
-      .then((rows) => {
+    Promise.all([listConversations(), listFolders()])
+      .then(([conversationRows, folderRows]) => {
         if (!cancelled) {
-          setConversations(rows)
+          setConversations(conversationRows)
+          setFolders(folderRows)
         }
       })
       .catch(() => {
         if (!cancelled) {
           setConversations([])
+          setFolders([])
         }
       })
     return () => {
@@ -187,6 +197,111 @@ export function ChatPanel() {
     [conversations],
   )
 
+  const handleCreateFolder = useCallback(async (name: string) => {
+    const trimmed = name.trim()
+    if (!trimmed) {
+      return
+    }
+    try {
+      const folder = await createFolder(trimmed)
+      setFolders((prev) =>
+        [...prev, folder].sort((a, b) => a.name.localeCompare(b.name)),
+      )
+      setExpandedFolderIds((prev) => new Set(prev).add(folder.id))
+    } catch {
+      setError('Failed to create folder')
+    }
+  }, [])
+
+  const handleRenameFolder = useCallback(
+    async (id: string, name: string) => {
+      const trimmed = name.trim()
+      if (!trimmed) {
+        return
+      }
+      const previous = folders
+      setFolders((prev) =>
+        prev
+          .map((folder) => (folder.id === id ? { ...folder, name: trimmed } : folder))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      )
+      try {
+        await renameFolder(id, trimmed)
+      } catch {
+        setFolders(previous)
+        setError('Failed to rename folder')
+      }
+    },
+    [folders],
+  )
+
+  const handleDeleteFolder = useCallback(
+    async (id: string) => {
+      const removedConversations = conversations.filter(
+        (conversation) => conversation.folder_id === id,
+      )
+      try {
+        await deleteFolder(id)
+      } catch {
+        setError('Failed to delete folder')
+        return
+      }
+      setFolders((prev) => prev.filter((folder) => folder.id !== id))
+      setConversations((prev) =>
+        prev.filter((conversation) => conversation.folder_id !== id),
+      )
+      setExpandedFolderIds((prev) => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+      const removedIds = new Set(removedConversations.map((conversation) => conversation.id))
+      setActiveId((current) => {
+        if (current && removedIds.has(current)) {
+          setMessages([])
+          return null
+        }
+        return current
+      })
+    },
+    [conversations],
+  )
+
+  const handleToggleFolder = useCallback((id: string) => {
+    setExpandedFolderIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }, [])
+
+  const handleMoveToFolder = useCallback(
+    async (conversationId: string, folderId: string | null) => {
+      const previous = conversations
+      setConversations((prev) =>
+        prev.map((conversation) =>
+          conversation.id === conversationId
+            ? { ...conversation, folder_id: folderId }
+            : conversation,
+        ),
+      )
+      if (folderId) {
+        setExpandedFolderIds((prev) => new Set(prev).add(folderId))
+      }
+      try {
+        await moveConversationToFolder(conversationId, folderId)
+      } catch {
+        setConversations(previous)
+        setError('Failed to move conversation')
+      }
+    },
+    [conversations],
+  )
+
   const ensureConversation = useCallback(async (): Promise<string | null> => {
     if (activeId) {
       return activeId
@@ -196,7 +311,13 @@ export function ChatPanel() {
       const now = new Date().toISOString()
       setActiveId(created.id)
       setConversations((prev) => [
-        { id: created.id, title: created.title, created_at: now, updated_at: now },
+        {
+          id: created.id,
+          title: created.title,
+          folder_id: created.folder_id ?? null,
+          created_at: now,
+          updated_at: now,
+        },
         ...prev,
       ])
       return created.id
@@ -333,12 +454,19 @@ export function ChatPanel() {
 
       <div className={sidebarOpen ? 'chat-body sidebar-open' : 'chat-body sidebar-closed'}>
         <ConversationList
+          folders={folders}
           conversations={conversations}
           activeId={activeId}
+          expandedFolderIds={expandedFolderIds}
           onSelect={handleSelect}
           onNew={handleNew}
           onDelete={handleDelete}
           onRename={handleRename}
+          onCreateFolder={handleCreateFolder}
+          onRenameFolder={handleRenameFolder}
+          onDeleteFolder={handleDeleteFolder}
+          onToggleFolder={handleToggleFolder}
+          onMoveToFolder={handleMoveToFolder}
         />
         <button
           type="button"

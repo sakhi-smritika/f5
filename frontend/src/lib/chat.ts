@@ -57,18 +57,84 @@ export async function deleteAttachment(
   }
 }
 
+export type ChatFolder = {
+  id: string
+  name: string
+  created_at: string
+  updated_at: string
+}
+
 export type Conversation = {
   id: string
   title: string | null
+  folder_id: string | null
   created_at: string
   updated_at: string
+}
+
+export async function listFolders(): Promise<ChatFolder[]> {
+  const { data, error } = await supabase
+    .from('chat_folder')
+    .select('id, name, created_at, updated_at')
+    .order('name', { ascending: true })
+
+  if (error) {
+    throw error
+  }
+
+  return data ?? []
+}
+
+export async function createFolder(name: string): Promise<ChatFolder> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    throw new Error('Not authenticated')
+  }
+
+  const { data, error } = await supabase
+    .from('chat_folder')
+    .insert({ name: name.trim(), user_id: user.id })
+    .select('id, name, created_at, updated_at')
+    .single()
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+export async function renameFolder(id: string, name: string): Promise<ChatFolder> {
+  const { data, error } = await supabase
+    .from('chat_folder')
+    .update({ name: name.trim() })
+    .eq('id', id)
+    .select('id, name, created_at, updated_at')
+    .single()
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+export async function deleteFolder(id: string): Promise<void> {
+  const response = await apiFetch(`/api/v1/chat/folders/${id}`, {
+    method: 'DELETE',
+  })
+  if (!response.ok) {
+    throw new Error('Failed to delete folder')
+  }
 }
 
 // The sidebar list is read straight from Supabase (RLS scopes it to the user).
 export async function listConversations(): Promise<Conversation[]> {
   const { data, error } = await supabase
     .from('conversations')
-    .select('id, title, created_at, updated_at')
+    .select('id, title, folder_id, created_at, updated_at')
     .order('updated_at', { ascending: false })
 
   if (error) {
@@ -78,10 +144,12 @@ export async function listConversations(): Promise<Conversation[]> {
   return data ?? []
 }
 
-export async function createConversation(): Promise<{ id: string; title: string }> {
+export async function createConversation(
+  folderId?: string | null,
+): Promise<{ id: string; title: string; folder_id: string | null }> {
   const response = await apiFetch('/api/v1/chat/conversations', {
     method: 'POST',
-    body: JSON.stringify({}),
+    body: JSON.stringify(folderId ? { folder_id: folderId } : {}),
   })
   if (!response.ok) {
     throw new Error('Failed to create conversation')
@@ -113,6 +181,23 @@ export async function renameConversation(
   )
   if (!response.ok) {
     throw new Error('Failed to rename conversation')
+  }
+  return response.json()
+}
+
+export async function moveConversationToFolder(
+  conversationId: string,
+  folderId: string | null,
+): Promise<{ id: string; folder_id: string | null }> {
+  const response = await apiFetch(
+    `/api/v1/chat/conversations/${conversationId}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ folder_id: folderId }),
+    },
+  )
+  if (!response.ok) {
+    throw new Error('Failed to move conversation')
   }
   return response.json()
 }

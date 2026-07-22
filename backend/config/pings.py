@@ -146,24 +146,24 @@ class Pings:
     @staticmethod
     @with_retries(retries=5)
     def ping_supabase_connection() -> bool:
-        """To check if SUPABASE_URL and SUPABASE_ANON_KEY works"""
+        """To check if SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY works"""
         supabase_url = os.getenv("SUPABASE_URL")
-        supabase_anon_key = os.getenv("SUPABASE_ANON_KEY")
+        supabase_publishable_key = os.getenv("SUPABASE_PUBLISHABLE_KEY")
 
-        if not supabase_url or not supabase_anon_key:
+        if not supabase_url or not supabase_publishable_key:
             logger.warning(
                 "Supabase connection details are not set",
                 extra={
                     "status": "failure",
-                    "error": "SUPABASE_URL or SUPABASE_ANON_KEY environment variables are missing",
+                    "error": "SUPABASE_URL or SUPABASE_PUBLISHABLE_KEY environment variables are missing",
                 },
             )
             return False
 
         try:
             headers = {
-                "apikey": supabase_anon_key,
-                "Authorization": f"Bearer {supabase_anon_key}",
+                "apikey": supabase_publishable_key,
+                "Authorization": f"Bearer {supabase_publishable_key}",
             }
 
             r = requests.get(f"{supabase_url}/rest/v1/", headers=headers, timeout=5)
@@ -397,13 +397,13 @@ class Pings:
     def ping_google_connections_table() -> bool:
         """Verify the google_connections table exists and is readable."""
         supabase_url = os.getenv("SUPABASE_URL")
-        service_key = os.getenv("SUPABASE_SERVICE_KEY")
+        service_key = os.getenv("SUPABASE_SECRET_KEY")
         if not supabase_url or not service_key:
             logger.warning(
                 "Supabase service key details are not set",
                 extra={
                     "status": "failure",
-                    "error": "SUPABASE_URL or SUPABASE_SERVICE_KEY environment variables are missing",
+                    "error": "SUPABASE_URL or SUPABASE_SECRET_KEY environment variables are missing",
                 },
             )
             return False
