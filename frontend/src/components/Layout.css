@@ -13,18 +13,6 @@
   box-sizing: border-box;
 }
 
-.layout-brand {
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-  text-decoration: none;
-  border-radius: 0.5rem;
-}
-
-.layout-brand:hover .app-logo {
-  opacity: 0.85;
-}
-
 .app-logo {
   display: block;
   object-fit: contain;
