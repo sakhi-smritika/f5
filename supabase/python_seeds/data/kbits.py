@@ -3,6 +3,11 @@
 Each entry belongs to a user (by email). ``goal_name`` optionally links the bit
 to a seeded goal of the same name (resolved to ``related_goal`` at seed time);
 omit it for goalless bits. Interaction flags default to unset when absent.
+
+``comments`` optionally seeds a discussion thread on the bit: each string is a
+user comment, and the agent generates a reply after each one (see
+005_seed_kbits). The bit itself is the subject of the thread and is never stored
+as a message.
 """
 
 SEED_KBITS = [
@@ -19,6 +24,10 @@ SEED_KBITS = [
         "goal_name": "Personal growth",
         "is_read": True,
         "is_liked": True,
+        "comments": [
+            "I keep failing to start my morning routine — where would you apply this first?",
+            "Okay: one push-up and one line in my journal. I'll try it tomorrow.",
+        ],
     },
     {
         "email": "seed_user@gmail.com",
@@ -33,6 +42,9 @@ SEED_KBITS = [
         "is_read": True,
         "is_marked_relavant": True,
         "rating": 5,
+        "comments": [
+            "What kind of question should I put at the top of the page?",
+        ],
     },
     {
         "email": "seed_user@gmail.com",
@@ -45,6 +57,9 @@ SEED_KBITS = [
         ),
         "goal_name": "Personal growth",
         "is_read": False,
+        "comments": [
+            "My phone is my biggest distraction. Any tip beyond just putting it away?",
+        ],
     },
     {
         "email": "seed_user@gmail.com",
@@ -125,6 +140,10 @@ SEED_KBITS = [
             "the debugging work; the fix is the easy part."
         ),
         "goal_name": "QA core flows",
+        "comments": [
+            "I have a flaky bug I can't reproduce reliably. How should I start?",
+            "Makes sense — I'll capture the exact steps and environment next time it fires.",
+        ],
     },
     {
         "email": "test@example.com",

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Check,
+  MessageCircle,
   Sparkles,
   SlidersHorizontal,
   ThumbsDown,
@@ -10,6 +11,7 @@ import {
 } from 'lucide-react'
 import {
   deleteKbit,
+  getKbitDiscussionMap,
   getStrategies,
   invokeKbits,
   listKbits,
@@ -18,6 +20,7 @@ import {
   type KnowledgeBit,
   type StrategyCatalog,
 } from '../lib/kbits'
+import { KbitComments } from '../components/kbits/KbitComments'
 import './KbitsPage.css'
 
 const STAGES = ['query', 'source', 'screen', 'rank'] as const
@@ -38,6 +41,8 @@ export function KbitsPage() {
     rank: '',
   })
   const [count, setCount] = useState(5)
+  // Bit ids that already have a discussion thread, so the card can show it.
+  const [discussed, setDiscussed] = useState<Set<string>>(new Set())
 
   const cardRefs = useRef(new Map<string, HTMLElement>())
   // Ids we've already tried to auto-mark-read, so a failed PATCH never retries
@@ -64,6 +69,23 @@ export function KbitsPage() {
     getStrategies()
       .then(setCatalog)
       .catch(() => setCatalog(null))
+  }, [])
+
+  useEffect(() => {
+    getKbitDiscussionMap()
+      .then((map) => setDiscussed(new Set(Object.keys(map))))
+      .catch(() => setDiscussed(new Set()))
+  }, [])
+
+  const markDiscussed = useCallback((id: string) => {
+    setDiscussed((current) => {
+      if (current.has(id)) {
+        return current
+      }
+      const next = new Set(current)
+      next.add(id)
+      return next
+    })
   }, [])
 
   const patchBit = useCallback((id: string, updates: KbitUpdate) => {
@@ -239,6 +261,8 @@ export function KbitsPage() {
               }}
               onUpdate={patchBit}
               onDelete={handleDelete}
+              hasDiscussion={discussed.has(bit.id)}
+              onDiscussionStarted={() => markDiscussed(bit.id)}
             />
           ))}
         </div>
@@ -252,8 +276,12 @@ function KbitCard(props: {
   registerRef: (element: HTMLElement | null) => void
   onUpdate: (id: string, updates: KbitUpdate) => void
   onDelete: (id: string) => void
+  hasDiscussion: boolean
+  onDiscussionStarted: () => void
 }) {
-  const { bit, registerRef, onUpdate, onDelete } = props
+  const { bit, registerRef, onUpdate, onDelete, hasDiscussion, onDiscussionStarted } =
+    props
+  const [showComments, setShowComments] = useState(false)
 
   return (
     <article className="kbits-card" data-bit-id={bit.id} ref={registerRef}>
@@ -318,6 +346,19 @@ function KbitCard(props: {
         </button>
         <button
           type="button"
+          className={
+            showComments || hasDiscussion ? 'kbits-action active' : 'kbits-action'
+          }
+          aria-pressed={showComments}
+          aria-label="Comments"
+          title="Comments"
+          onClick={() => setShowComments((open) => !open)}
+        >
+          <MessageCircle size={18} aria-hidden="true" />
+          {hasDiscussion ? <span className="kbits-action-dot" aria-hidden="true" /> : null}
+        </button>
+        <button
+          type="button"
           className="kbits-action kbits-action-danger"
           aria-label="Delete"
           title="Delete"
@@ -326,6 +367,9 @@ function KbitCard(props: {
           <Trash2 size={18} aria-hidden="true" />
         </button>
       </div>
+      {showComments ? (
+        <KbitComments kbitId={bit.id} onStarted={onDiscussionStarted} />
+      ) : null}
     </article>
   )
 }

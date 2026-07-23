@@ -70,6 +70,8 @@ export type Conversation = {
   folder_id: string | null
   created_at: string
   updated_at: string
+  // Set when the conversation is a knowledge-bit discussion thread.
+  kbit_id?: string | null
 }
 
 export async function listFolders(): Promise<ChatFolder[]> {
@@ -134,7 +136,7 @@ export async function deleteFolder(id: string): Promise<void> {
 export async function listConversations(): Promise<Conversation[]> {
   const { data, error } = await supabase
     .from('conversations')
-    .select('id, title, folder_id, created_at, updated_at')
+    .select('id, title, folder_id, created_at, updated_at, kbit_id')
     .order('updated_at', { ascending: false })
 
   if (error) {

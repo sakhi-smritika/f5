@@ -22,6 +22,13 @@ current_location_label: ContextVar[str | None] = ContextVar(
     "current_location_label", default=None
 )
 
+# The knowledge bit under discussion, when a conversation is a kbit thread. Set
+# per request from the linked bit (title/content/related_goal) so the agent can
+# ground its replies in it. The bit is never stored as a chat message; it lives
+# only in the system prompt, re-derived from the conversation's kbit_id on every
+# turn (see agent._instruction_provider).
+current_kbit: ContextVar[dict | None] = ContextVar("current_kbit", default=None)
+
 
 def require_user_id() -> str:
     """Return the current user's id or raise if it has not been set.

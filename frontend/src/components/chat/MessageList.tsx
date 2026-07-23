@@ -4,11 +4,19 @@ import remarkGfm from 'remark-gfm'
 import { Check, Copy, FileText, Quote } from 'lucide-react'
 import type { ChatAttachment, ChatMessage } from '../../lib/chat'
 
+type PinnedKbit = {
+  title: string
+  content: string
+}
+
 type MessageListProps = {
   messages: ChatMessage[]
   streaming: boolean
   error: string | null
   onQuote?: (text: string) => void
+  // When set, the conversation is a knowledge-bit discussion: the bit is pinned
+  // at the top of the thread so it reads as the subject of the discussion.
+  pinnedKbit?: PinnedKbit | null
 }
 
 type QuoteButtonState = {
@@ -97,7 +105,13 @@ function CopyButton({
   )
 }
 
-export function MessageList({ messages, streaming, error, onQuote }: MessageListProps) {
+export function MessageList({
+  messages,
+  streaming,
+  error,
+  onQuote,
+  pinnedKbit,
+}: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
@@ -206,8 +220,20 @@ export function MessageList({ messages, streaming, error, onQuote }: MessageList
       ) : null}
 
       <div className="chat-messages" ref={scrollRef}>
+        {pinnedKbit ? (
+          <div className="chat-pinned-kbit">
+            <span className="chat-pinned-kbit-label">Knowledge Bit</span>
+            <h3 className="chat-pinned-kbit-title">{pinnedKbit.title}</h3>
+            <p className="chat-pinned-kbit-content">{pinnedKbit.content}</p>
+          </div>
+        ) : null}
+
         {messages.length === 0 && !streaming ? (
-          <p className="chat-empty-hint">Ask me anything to get started.</p>
+          <p className="chat-empty-hint">
+            {pinnedKbit
+              ? 'Add a comment to start discussing this with Smritika.'
+              : 'Ask me anything to get started.'}
+          </p>
         ) : null}
 
         {messages.map((message, index) => {

@@ -102,10 +102,17 @@ def persist_after_turn(
     user_text: str,
     attachments: list[dict] | None = None,
 ) -> str:
-    """Update the conversation title (first turn) and bump updated_at."""
+    """Update the conversation title (first turn) and bump updated_at.
+
+    Kbit discussions keep the bit's title, so we never derive a title from the
+    comment text; the update still runs so the ``updated_at`` trigger fires and
+    the thread rises to the top of the sidebar.
+    """
     current_title = conversation.get("title")
     new_title = current_title
-    if not current_title or current_title == DEFAULT_TITLE:
+    if not conversation.get("kbit_id") and (
+        not current_title or current_title == DEFAULT_TITLE
+    ):
         title_source = user_text.strip()
         if not title_source and attachments:
             title_source = attachments[0]["filename"]

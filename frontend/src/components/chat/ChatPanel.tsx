@@ -25,6 +25,7 @@ import {
   setStoredChatModel,
   type ChatModel,
 } from '../../lib/models'
+import { getKbitById } from '../../lib/kbits'
 import { Composer } from './Composer'
 import { ConversationList } from './ConversationList'
 import { MessageList } from './MessageList'
@@ -75,6 +76,10 @@ export function ChatPanel() {
   const [models, setModels] = useState<ChatModel[]>([])
   const [selectedModel, setSelectedModel] = useState('')
   const [quote, setQuote] = useState<string | null>(null)
+  // The bit pinned at the top when the active conversation is a kbit discussion.
+  const [activeKbit, setActiveKbit] = useState<{ title: string; content: string } | null>(
+    null,
+  )
 
   useEffect(() => {
     if (!user?.id) {
@@ -139,6 +144,7 @@ export function ChatPanel() {
     setActiveId(null)
     setMessages([])
     setError(null)
+    setActiveKbit(null)
     closeSidebarOnMobile()
   }, [closeSidebarOnMobile])
 
@@ -147,7 +153,19 @@ export function ChatPanel() {
       setActiveId(id)
       setMessages([])
       setError(null)
+      setActiveKbit(null)
       closeSidebarOnMobile()
+
+      const kbitId =
+        conversations.find((conversation) => conversation.id === id)?.kbit_id ?? null
+      if (kbitId) {
+        getKbitById(kbitId)
+          .then((bit) =>
+            setActiveKbit(bit ? { title: bit.title, content: bit.content } : null),
+          )
+          .catch(() => setActiveKbit(null))
+      }
+
       try {
         const loaded = await loadMessages(id)
         setMessages(loaded)
@@ -155,7 +173,7 @@ export function ChatPanel() {
         setError('Failed to load messages')
       }
     },
-    [closeSidebarOnMobile],
+    [closeSidebarOnMobile, conversations],
   )
 
   const handleDelete = useCallback(
@@ -487,6 +505,7 @@ export function ChatPanel() {
             streaming={streaming}
             error={error}
             onQuote={setQuote}
+            pinnedKbit={activeKbit}
           />
           <Composer
             disabled={streaming}

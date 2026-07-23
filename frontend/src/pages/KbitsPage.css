@@ -189,6 +189,7 @@
 }
 
 .kbits-action {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -200,6 +201,17 @@
   background: transparent;
   color: var(--text-h);
   cursor: pointer;
+}
+
+/* Small badge on the comment action when a bit already has a discussion. */
+.kbits-action-dot {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--accent);
 }
 
 .kbits-action:hover {

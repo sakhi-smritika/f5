@@ -39,6 +39,22 @@ export async function listKbits(options: { unreadOnly?: boolean } = {}): Promise
   return (data ?? []) as unknown as KnowledgeBit[]
 }
 
+// Fetch a single bit (RLS-scoped) so the chat window can pin its content at the
+// top of a discussion thread.
+export async function getKbitById(id: string): Promise<KnowledgeBit | null> {
+  const { data, error } = await supabase
+    .from('knowledge_bits')
+    .select(KBIT_COLUMNS)
+    .eq('id', id)
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    throw error
+  }
+  return (data as unknown as KnowledgeBit) ?? null
+}
+
 export type StageStrategies = {
   default: string | null
   options: string[]
@@ -117,9 +133,48 @@ export async function updateKbit(id: string, updates: KbitUpdate): Promise<void>
   }
 }
 
+// Deletion goes through the backend (not straight to Supabase) so the server can
+// tear down the bit's discussion ADK session — the DB cascade only removes the
+// conversations metadata row, not ADK's own session/event tables.
 export async function deleteKbit(id: string): Promise<void> {
-  const { error } = await supabase.from('knowledge_bits').delete().eq('id', id)
+  const response = await apiFetch(`/api/v1/kbits/${id}`, { method: 'DELETE' })
+  if (!response.ok) {
+    throw new Error('Failed to delete knowledge bit')
+  }
+}
+
+// Get or lazily create the discussion conversation for a bit, reusing the chat
+// machinery. Returns the conversation id to load/stream comments against via the
+// chat lib (loadMessages / streamMessage).
+export async function ensureKbitDiscussion(kbitId: string): Promise<string> {
+  const response = await apiFetch(`/api/v1/kbits/${kbitId}/discussion`, {
+    method: 'POST',
+  })
+  if (!response.ok) {
+    throw new Error('Failed to open discussion')
+  }
+  const data = (await response.json()) as { conversation_id: string }
+  return data.conversation_id
+}
+
+// Map of kbit_id -> conversation_id for bits that already have a discussion
+// thread. Read straight from Supabase (RLS-scoped) so the feed can show which
+// bits are already being discussed without opening each one.
+export async function getKbitDiscussionMap(): Promise<Record<string, string>> {
+  const { data, error } = await supabase
+    .from('conversations')
+    .select('id, kbit_id')
+    .not('kbit_id', 'is', null)
+
   if (error) {
     throw error
   }
+
+  const map: Record<string, string> = {}
+  for (const row of (data ?? []) as { id: string; kbit_id: string | null }[]) {
+    if (row.kbit_id) {
+      map[row.kbit_id] = row.id
+    }
+  }
+  return map
 }

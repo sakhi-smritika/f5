@@ -1,0 +1,101 @@
+.kbit-comments {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
+}
+
+.kbit-comments-status,
+.kbit-comments-empty {
+  margin: 0;
+  padding: 0.5rem 0.25rem;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.kbit-comments-empty {
+  opacity: 0.85;
+}
+
+.kbit-comments-error {
+  margin: 0;
+  padding: 0 0.25rem;
+  color: #dc2626;
+  font-size: 13px;
+}
+
+/* Bound the reused chat thread so it scrolls inside the card instead of growing
+   it unbounded. MessageList's own .chat-messages handles the inner scroll. */
+.kbit-comments-thread {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 22rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+/* Tighten the reused chat message padding for the narrower comment context. */
+.kbit-comments-thread .chat-messages {
+  padding: 0.75rem;
+  gap: 0.6rem;
+}
+
+.kbit-comments-thread .chat-message {
+  font-size: 14px;
+}
+
+.kbit-comments-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.kbit-comments-input {
+  flex: 1;
+  resize: none;
+  max-height: 120px;
+  overflow-y: auto;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  background: transparent;
+  color: var(--text-h);
+  font: inherit;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.kbit-comments-input:focus {
+  outline: none;
+  border-color: var(--accent-border);
+}
+
+.kbit-comments-input:disabled {
+  opacity: 0.6;
+}
+
+.kbit-comments-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  padding: 0;
+  border: 1px solid var(--accent-border);
+  border-radius: 0.6rem;
+  background: var(--accent-bg);
+  color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.kbit-comments-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

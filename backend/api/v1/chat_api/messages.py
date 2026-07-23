@@ -8,6 +8,7 @@ from google.genai import types
 from agent.agent import APP_NAME, get_runner, get_session_service
 from agent.attachment_parts import build_user_message_parts, is_attachment_text
 from agent.tools.context import (
+    current_kbit,
     current_location_label,
     current_now_label,
     current_user_id,
@@ -79,6 +80,20 @@ async def send_message(
 ) -> StreamingResponse:
     """Send a user message and stream the assistant's reply back as SSE."""
     conversation = get_owned_conversation(conversation_id, user.id)
+
+    # Kbit discussions carry the bit's context in the system prompt (never as a
+    # chat message), re-derived from kbit_id on every turn. Imported locally to
+    # avoid a chat<->kbits import cycle at module load.
+    kbit_context: dict | None = None
+    kbit_id = conversation.get("kbit_id")
+    if kbit_id:
+        from api.v1.kbits_api.access import get_owned_kbit
+
+        try:
+            kbit_context = get_owned_kbit(kbit_id, user.id)
+        except HTTPException:
+            kbit_context = None
+
     try:
         model_id = resolve_model(body.model)
         get_api_key_for_model(model_id)
@@ -111,6 +126,7 @@ async def send_message(
         token = current_user_id.set(user.id)
         now_token = current_now_label.set(build_now_label(body))
         location_token = current_location_label.set(build_location_label(body))
+        kbit_token = current_kbit.set(kbit_context)
         try:
             async for event in runner.run_async(
                 user_id=user.id,
@@ -146,6 +162,7 @@ async def send_message(
             current_user_id.reset(token)
             current_now_label.reset(now_token)
             current_location_label.reset(location_token)
+            current_kbit.reset(kbit_token)
 
     return StreamingResponse(
         event_stream(),

@@ -79,13 +79,35 @@ def update_kbit(
 
 
 @router.delete("/{kbit_id}")
-def delete_kbit(
+async def delete_kbit(
     kbit_id: str,
     user: AuthenticatedUser = Depends(get_current_user),
 ) -> dict:
-    """Delete a knowledge bit."""
+    """Delete a knowledge bit and any discussion thread attached to it.
+
+    The DB cascade removes the ``conversations`` metadata row, but ADK's own
+    session/event tables are keyed by session id and do not cascade, so we tear
+    the discussion down through the existing helper first (which also removes any
+    attachments) to avoid orphaning it.
+    """
     get_owned_kbit(kbit_id, user.id)
-    get_supabase_service_client().table("knowledge_bits").delete().eq(
-        "id", kbit_id
-    ).eq("user_id", user.id).execute()
+
+    client = get_supabase_service_client()
+    discussion = (
+        client.table("conversations")
+        .select("id")
+        .eq("kbit_id", kbit_id)
+        .eq("user_id", user.id)
+        .limit(1)
+        .execute()
+    )
+    rows = discussion.data or []
+    if rows:
+        from api.v1.chat_api.conversations import delete_conversation_fully
+
+        await delete_conversation_fully(rows[0]["id"], user.id)
+
+    client.table("knowledge_bits").delete().eq("id", kbit_id).eq(
+        "user_id", user.id
+    ).execute()
     return {"ok": True}

@@ -16,7 +16,11 @@ from google.adk.runners import Runner
 from google.adk.sessions import DatabaseSessionService
 
 from agent.profile_context import build_profile_instruction_context
-from agent.tools.context import current_location_label, current_now_label
+from agent.tools.context import (
+    current_kbit,
+    current_location_label,
+    current_now_label,
+)
 from agent.tools.registry import ALL_TOOLS
 from config.llm_keys import get_api_key_for_model
 from config.models import get_default_model_id
@@ -81,6 +85,25 @@ def _instruction_provider(_ctx) -> str:
     profile_context = build_profile_instruction_context()
     if profile_context:
         extras.append(profile_context)
+
+    kbit = current_kbit.get()
+    if kbit:
+        goal_note = (
+            f" It is tied to one of the user's goals (goal id {kbit['related_goal']}); "
+            "use the goal tools if it helps to ground your advice."
+            if kbit.get("related_goal")
+            else ""
+        )
+        extras.append(
+            "You are Smritika, discussing one specific Knowledge Bit with the user "
+            "in a threaded comment section. The bit below is the subject of this "
+            "conversation: treat the user's comments as being about it, ground every "
+            "reply in it, and help the user reflect on it, apply it to their life and "
+            "goals, and go deeper over time." + goal_note + " Keep replies warm and "
+            "concise. Do not repeat the bit back verbatim; build on it.\n\n"
+            f"Knowledge Bit title: {kbit['title']}\n"
+            f"Knowledge Bit content:\n{kbit['content']}"
+        )
 
     if not extras:
         return INSTRUCTION
