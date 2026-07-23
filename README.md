@@ -1,6 +1,11 @@
 # Framework 5
 
-A personal-growth app. 
+A personal-growth app.
+
+> **New here?** For the *conceptual* guide — what the product believes, how it
+> thinks, and how a person's intent flows through it — start with
+> [`docs/`](docs/README.md). This README covers setup and code; `docs/` covers the
+> philosophy and flows.
 
 ## Architecture
 
