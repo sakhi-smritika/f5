@@ -1,0 +1,74 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Xcode
+## User-specific settings (schemes, breakpoints, UI state)
+xcuserdata/
+*.xcuserstate
+
+## Build artifacts
+build/
+DerivedData/
+*.moved-aside
+*.hmap
+
+## Legacy Xcode
+*.xcscmblueprint
+*.xccheckout
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+
+## App packaging
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+## Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/
+Package.pins
+Package.resolved
+*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+
+# CocoaPods
+Pods/
+
+# Carthage
+Carthage/Build/
+
+# fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# Accio
+Dependencies/
+.accio/
+
+# Code injection
+iOSInjectionProject/
+
+# Environment & secrets
+.env
+.env.*
+*.xcconfig.local
+
+# IDE
+.idea/
+*.swp
+*~
