@@ -1,17 +1,14 @@
-//
-//  Sakhi_SmritikaApp.swift
-//  Sakhi Smritika
-//
-//  Created by Purushottam Veerbhadra Dafure on 25/07/26.
-//
-
 import SwiftUI
 
 @main
 struct Sakhi_SmritikaApp: App {
+    @State private var dependencies = AppDependencies()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
+                .environment(dependencies)
+                .environment(dependencies.authService)
         }
     }
 }

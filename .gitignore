@@ -1,3 +1,5 @@
 temp/
 .vscode/
 TODO
+.DS_Store
+**/.DS_Store

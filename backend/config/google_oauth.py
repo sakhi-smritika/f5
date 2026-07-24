@@ -100,22 +100,32 @@ def _b64url_decode(data: str) -> bytes:
     return base64.urlsafe_b64decode(data + padding)
 
 
-def sign_state(user_id: str, *, code_verifier: str | None = None) -> str:
+def sign_state(
+    user_id: str,
+    *,
+    code_verifier: str | None = None,
+    success_redirect: str | None = None,
+) -> str:
     """Return a signed, short-lived state token binding the flow to ``user_id``.
 
     When PKCE is used, pass the ``code_verifier`` generated for the authorize
     step so the callback can complete the token exchange statelessly.
+
+    Optional ``success_redirect`` lets mobile clients return to a custom URL
+    scheme after Google finishes (validated in ``resolve_success_redirect``).
     """
     payload = {"uid": user_id, "exp": int(time.time()) + _STATE_TTL_SECONDS}
     if code_verifier:
         payload["cv"] = code_verifier
+    if success_redirect:
+        payload["sr"] = success_redirect
     body = _b64url_encode(json.dumps(payload, separators=(",", ":")).encode())
     signature = hmac.new(_state_secret(), body.encode(), hashlib.sha256).digest()
     return f"{body}.{_b64url_encode(signature)}"
 
 
-def verify_state(state: str) -> tuple[str, str | None]:
-    """Verify a state token and return ``(user_id, code_verifier)``.
+def verify_state(state: str) -> tuple[str, str | None, str | None]:
+    """Verify a state token and return ``(user_id, code_verifier, success_redirect)``.
 
     Raises ``ValueError`` when the token is invalid or expired.
     """
@@ -135,7 +145,26 @@ def verify_state(state: str) -> tuple[str, str | None]:
     user_id = payload.get("uid")
     if not user_id:
         raise ValueError("State missing user")
-    return user_id, payload.get("cv")
+    return user_id, payload.get("cv"), payload.get("sr")
+
+
+def resolve_success_redirect(requested: str | None) -> str:
+    """Return an allowlisted post-OAuth redirect, falling back to env default."""
+    default = get_success_redirect()
+    if not requested:
+        return default
+
+    requested = requested.strip()
+    # Custom URL scheme for the iOS app (ASWebAuthenticationSession).
+    if requested.startswith("sakhi-smritika://"):
+        return requested.rstrip("/")
+
+    # Same origin as the configured web success redirect.
+    default_base = default.rstrip("/")
+    if requested.rstrip("/") == default_base or requested.startswith(default_base + "?"):
+        return requested.rstrip("/")
+
+    raise ValueError("success_redirect is not allowlisted")
 
 
 # --- Refresh-token encryption at rest --------------------------------------

@@ -1,0 +1,7 @@
+#include "Shared.xcconfig"
+
+// TODO: Replace placeholders with your staging project values.
+SUPABASE_URL = https:/$()/YOUR_STAGING_PROJECT.supabase.co
+SUPABASE_PUBLISHABLE_KEY = YOUR_STAGING_PUBLISHABLE_KEY
+BACKEND_URL = https:/$()/api-staging.example.com
+APP_ENVIRONMENT = Staging

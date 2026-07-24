@@ -1,0 +1,9 @@
+#include "Shared.xcconfig"
+
+// Local Supabase + FastAPI (Simulator). For a physical device, replace
+// 127.0.0.1 with your Mac's LAN IP.
+SUPABASE_URL = http:/$()/127.0.0.1:54321
+// Default local anon key from `supabase start` — replace if your project differs.
+SUPABASE_PUBLISHABLE_KEY = sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH
+BACKEND_URL = http:/$()/127.0.0.1:8080
+APP_ENVIRONMENT = Local

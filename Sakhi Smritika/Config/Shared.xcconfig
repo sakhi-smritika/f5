@@ -1,0 +1,5 @@
+// Shared settings across all environments.
+// URL values are defined per-environment (Local / Staging / Production).
+
+// Escape // in URLs as /$()/ so xcconfig does not treat them as comments.
+// Example: http:/$()/127.0.0.1:54321

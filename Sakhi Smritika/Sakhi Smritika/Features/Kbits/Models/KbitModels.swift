@@ -1,0 +1,129 @@
+import Foundation
+
+struct KnowledgeBit: Codable, Identifiable, Hashable, Sendable {
+    let id: UUID
+    let createdAt: String?
+    let updatedAt: String?
+    var title: String
+    var content: String
+    var relatedGoal: UUID?
+    var isRead: Bool
+    var isLiked: Bool
+    var isDisliked: Bool
+    var rating: Double?
+    /// Schema typo preserved from backend/DB.
+    var isMarkedRelavant: Bool
+    /// Schema typo preserved from backend/DB.
+    var isMarkedIrrelavant: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case title
+        case content
+        case relatedGoal = "related_goal"
+        case isRead = "is_read"
+        case isLiked = "is_liked"
+        case isDisliked = "is_disliked"
+        case rating
+        case isMarkedRelavant = "is_marked_relavant"
+        case isMarkedIrrelavant = "is_marked_irrelavant"
+    }
+}
+
+struct StageStrategies: Codable, Sendable {
+    let defaultStrategy: String?
+    let options: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case defaultStrategy = "default"
+        case options
+    }
+}
+
+struct StrategyCatalog: Codable, Sendable {
+    let query: StageStrategies
+    let source: StageStrategies
+    let screen: StageStrategies
+    let rank: StageStrategies
+}
+
+struct InvokeKbitsBody: Encodable, Sendable {
+    var goalId: UUID? = nil
+    var count: Int? = nil
+    var queryStrategy: String? = nil
+    var sourceStrategy: String? = nil
+    var screenStrategy: String? = nil
+    var rankStrategy: String? = nil
+
+    enum CodingKeys: String, CodingKey {
+        case goalId = "goal_id"
+        case count
+        case queryStrategy = "query_strategy"
+        case sourceStrategy = "source_strategy"
+        case screenStrategy = "screen_strategy"
+        case rankStrategy = "rank_strategy"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        if let goalId { try container.encode(goalId, forKey: .goalId) }
+        if let count { try container.encode(count, forKey: .count) }
+        if let queryStrategy, !queryStrategy.isEmpty {
+            try container.encode(queryStrategy, forKey: .queryStrategy)
+        }
+        if let sourceStrategy, !sourceStrategy.isEmpty {
+            try container.encode(sourceStrategy, forKey: .sourceStrategy)
+        }
+        if let screenStrategy, !screenStrategy.isEmpty {
+            try container.encode(screenStrategy, forKey: .screenStrategy)
+        }
+        if let rankStrategy, !rankStrategy.isEmpty {
+            try container.encode(rankStrategy, forKey: .rankStrategy)
+        }
+    }
+}
+
+struct InvokeKbitsResponse: Codable, Sendable {
+    let count: Int?
+    let bits: [KnowledgeBit]
+}
+
+struct KbitUpdate: Encodable, Sendable {
+    var isRead: Bool? = nil
+    var isLiked: Bool? = nil
+    var isDisliked: Bool? = nil
+    var rating: Double? = nil
+    var isMarkedRelavant: Bool? = nil
+    var isMarkedIrrelavant: Bool? = nil
+
+    enum CodingKeys: String, CodingKey {
+        case isRead = "is_read"
+        case isLiked = "is_liked"
+        case isDisliked = "is_disliked"
+        case rating
+        case isMarkedRelavant = "is_marked_relavant"
+        case isMarkedIrrelavant = "is_marked_irrelavant"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        if let isRead { try container.encode(isRead, forKey: .isRead) }
+        if let isLiked { try container.encode(isLiked, forKey: .isLiked) }
+        if let isDisliked { try container.encode(isDisliked, forKey: .isDisliked) }
+        if let rating { try container.encode(rating, forKey: .rating) }
+        if let isMarkedRelavant { try container.encode(isMarkedRelavant, forKey: .isMarkedRelavant) }
+        if let isMarkedIrrelavant { try container.encode(isMarkedIrrelavant, forKey: .isMarkedIrrelavant) }
+    }
+}
+
+struct EnsureDiscussionResponse: Codable, Sendable {
+    let conversationId: UUID
+    let created: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case conversationId = "conversation_id"
+        case created
+    }
+}

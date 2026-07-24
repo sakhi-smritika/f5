@@ -13,7 +13,7 @@ from datetime import timezone
 from urllib.parse import urlencode
 from urllib.request import Request as UrlRequest, urlopen
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from google.auth.transport.requests import Request
 
@@ -29,6 +29,7 @@ from config.google_oauth import (
     GOOGLE_SCOPES,
     build_flow,
     get_success_redirect,
+    resolve_success_redirect,
     sign_state,
     verify_state,
 )
@@ -41,19 +42,47 @@ router = APIRouter(prefix="/integrations", tags=["integrations"])
 callback_router = APIRouter(tags=["integrations"])
 
 
-def _redirect_with_status(*, success: bool, message: str = "") -> RedirectResponse:
+def _redirect_with_status(
+    *,
+    success: bool,
+    message: str = "",
+    success_redirect: str | None = None,
+) -> RedirectResponse:
     params: dict[str, str] = {"google": "connected" if success else "error"}
     if message:
         params["message"] = message
-    base = get_success_redirect().rstrip("/")
+    try:
+        base = resolve_success_redirect(success_redirect).rstrip("/")
+    except ValueError:
+        base = get_success_redirect().rstrip("/")
     return RedirectResponse(url=f"{base}?{urlencode(params)}", status_code=302)
 
 
 @router.get("/google/authorize")
-def google_authorize(user: AuthenticatedUser = Depends(get_current_user)) -> dict:
-    """Return the Google consent URL for the signed-in user to open."""
+def google_authorize(
+    user: AuthenticatedUser = Depends(get_current_user),
+    success_redirect: str | None = Query(default=None),
+) -> dict:
+    """Return the Google consent URL for the signed-in user to open.
+
+    Optional ``success_redirect`` (e.g. ``sakhi-smritika://oauth``) is embedded
+    in the signed OAuth state so the callback can return mobile clients to the app.
+    """
+    if success_redirect:
+        try:
+            success_redirect = resolve_success_redirect(success_redirect)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
+
     code_verifier = secrets.token_urlsafe(64)
-    state = sign_state(user.id, code_verifier=code_verifier)
+    state = sign_state(
+        user.id,
+        code_verifier=code_verifier,
+        success_redirect=success_redirect,
+    )
     flow = build_flow(state=state)
     flow.code_verifier = code_verifier
     auth_url, _ = flow.authorization_url(
@@ -72,15 +101,25 @@ def google_callback(
     error: str | None = Query(default=None),
 ) -> RedirectResponse:
     """OAuth redirect target. Exchanges the code and stores encrypted tokens."""
+    success_redirect: str | None = None
+
     if error:
         logger.warning("Google OAuth denied", extra={"error": error})
-        return _redirect_with_status(success=False, message=error)
+        # Best-effort: still try to parse state for mobile redirect.
+        if state:
+            try:
+                _, _, success_redirect = verify_state(state)
+            except ValueError:
+                success_redirect = None
+        return _redirect_with_status(
+            success=False, message=error, success_redirect=success_redirect
+        )
 
     if not code or not state:
         return _redirect_with_status(success=False, message="Missing code or state")
 
     try:
-        user_id, code_verifier = verify_state(state)
+        user_id, code_verifier, success_redirect = verify_state(state)
     except ValueError as exc:
         logger.warning("Invalid Google OAuth state", extra={"detail": str(exc)})
         return _redirect_with_status(success=False, message="Invalid or expired state")
@@ -104,6 +143,7 @@ def google_callback(
         return _redirect_with_status(
             success=False,
             message=f"Token exchange failed: {exc}",
+            success_redirect=success_redirect,
         )
 
     if not creds.refresh_token:
@@ -114,6 +154,7 @@ def google_callback(
         return _redirect_with_status(
             success=False,
             message="No refresh token received; try disconnecting and reconnecting",
+            success_redirect=success_redirect,
         )
 
     expiry = creds.expiry
@@ -130,7 +171,7 @@ def google_callback(
         google_email=google_email,
     )
     logger.info("Google connected", extra={"user_id": user_id, "google_email": google_email})
-    return _redirect_with_status(success=True)
+    return _redirect_with_status(success=True, success_redirect=success_redirect)
 
 
 @router.get("/google/status")

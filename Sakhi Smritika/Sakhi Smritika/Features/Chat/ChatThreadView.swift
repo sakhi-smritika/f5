@@ -1,0 +1,281 @@
+import PhotosUI
+import SwiftUI
+import UniformTypeIdentifiers
+
+struct ChatThreadView: View {
+    let conversation: Conversation?
+    let listViewModel: ChatListViewModel
+
+    @Environment(AppDependencies.self) private var dependencies
+    @State private var viewModel: ChatThreadViewModel?
+    @State private var photoItems: [PhotosPickerItem] = []
+    @State private var showFileImporter = false
+    @FocusState private var composerFocused: Bool
+
+    var body: some View {
+        Group {
+            if let viewModel {
+                threadContent(viewModel)
+            } else {
+                LoadingView()
+            }
+        }
+        .navigationTitle(viewModel?.title ?? conversation?.displayTitle ?? "New chat")
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            if viewModel == nil {
+                viewModel = ChatThreadViewModel(
+                    conversation: conversation,
+                    models: listViewModel.models,
+                    selectedModelId: listViewModel.selectedModelId,
+                    apiClient: dependencies.apiClient,
+                    onConversationUpdated: { updated in
+                        listViewModel.upsertConversation(updated)
+                        listViewModel.selectModel(listViewModel.selectedModelId)
+                    }
+                )
+            }
+            await viewModel?.loadIfNeeded()
+        }
+    }
+
+    @ViewBuilder
+    private func threadContent(_ vm: ChatThreadViewModel) -> some View {
+        @Bindable var vm = vm
+
+        VStack(spacing: 0) {
+            messageScroll(vm)
+
+            if let sendError = vm.sendError {
+                Text(sendError)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+            }
+
+            composer(vm)
+        }
+        .background(Color(.systemGroupedBackground))
+        .onChange(of: photoItems) { _, items in
+            guard !items.isEmpty else { return }
+            Task {
+                var files: [(Data, String, String)] = []
+                for item in items {
+                    if let data = try? await item.loadTransferable(type: Data.self) {
+                        let filename = "photo-\(UUID().uuidString.prefix(8)).jpg"
+                        files.append((data, filename, "image/jpeg"))
+                    }
+                }
+                photoItems = []
+                await vm.addFiles(files)
+            }
+        }
+        .fileImporter(
+            isPresented: $showFileImporter,
+            allowedContentTypes: [.item],
+            allowsMultipleSelection: true
+        ) { result in
+            guard case .success(let urls) = result else { return }
+            Task {
+                var files: [(Data, String, String)] = []
+                for url in urls {
+                    let accessed = url.startAccessingSecurityScopedResource()
+                    defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+                    if let data = try? Data(contentsOf: url) {
+                        let mime = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType
+                            ?? "application/octet-stream"
+                        files.append((data, url.lastPathComponent, mime))
+                    }
+                }
+                await vm.addFiles(files)
+            }
+        }
+    }
+
+    private func messageScroll(_ vm: ChatThreadViewModel) -> some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 14) {
+                    if vm.isLoading {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 40)
+                    } else if let loadError = vm.loadError {
+                        Text(loadError)
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                            .padding()
+                    } else if vm.messages.isEmpty {
+                        ContentUnavailableView(
+                            "Ask Sakhi anything",
+                            systemImage: "sparkles",
+                            description: Text("Send a message to get started.")
+                        )
+                        .padding(.top, 48)
+                    } else {
+                        ForEach(vm.messages) { message in
+                            MessageBubbleView(
+                                message: message,
+                                isStreaming: vm.isStreaming && message.id == vm.messages.last?.id
+                                    && message.role == .assistant
+                            )
+                            .id(message.id)
+                        }
+                    }
+                }
+                .padding(16)
+            }
+            .onChange(of: vm.messages) { _, messages in
+                if let last = messages.last?.id {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        proxy.scrollTo(last, anchor: .bottom)
+                    }
+                }
+            }
+        }
+    }
+
+    private func composer(_ vm: ChatThreadViewModel) -> some View {
+        @Bindable var vm = vm
+
+        return VStack(alignment: .leading, spacing: 10) {
+            if let quote = vm.quote {
+                HStack {
+                    Text(quote)
+                        .font(.caption)
+                        .lineLimit(2)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button {
+                        vm.quote = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .padding(10)
+                .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+
+            if !vm.pendingAttachments.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(vm.pendingAttachments) { attachment in
+                            HStack(spacing: 6) {
+                                if attachment.isUploading {
+                                    ProgressView().controlSize(.mini)
+                                }
+                                Text(attachment.filename)
+                                    .font(.caption)
+                                    .lineLimit(1)
+                                Button {
+                                    Task { await vm.removePendingAttachment(attachment) }
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.caption)
+                                }
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(.regularMaterial, in: Capsule())
+                        }
+                    }
+                }
+            }
+
+            if vm.models.count > 1 {
+                Picker("Model", selection: $vm.selectedModelId) {
+                    ForEach(vm.models) { model in
+                        Text(model.label).tag(model.id)
+                    }
+                }
+                .pickerStyle(.menu)
+                .onChange(of: vm.selectedModelId) { _, id in
+                    listViewModel.selectModel(id)
+                }
+            }
+
+            HStack(alignment: .bottom, spacing: 10) {
+                Menu {
+                    PhotosPicker(selection: $photoItems, maxSelectionCount: 4, matching: .images) {
+                        Label("Photos", systemImage: "photo")
+                    }
+                    Button {
+                        showFileImporter = true
+                    } label: {
+                        Label("Files", systemImage: "doc")
+                    }
+                } label: {
+                    Image(systemName: "paperclip")
+                        .font(.title3)
+                        .frame(width: 36, height: 36)
+                }
+                .disabled(vm.isStreaming)
+
+                TextField("Message", text: $vm.draft, axis: .vertical)
+                    .lineLimit(1...6)
+                    .focused($composerFocused)
+                    .padding(12)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+                Button {
+                    Task { await vm.send() }
+                } label: {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 32))
+                        .symbolRenderingMode(.hierarchical)
+                }
+                .disabled(!vm.canSend)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(.ultraThinMaterial)
+    }
+}
+
+struct MessageBubbleView: View {
+    let message: ChatMessage
+    var isStreaming: Bool = false
+
+    private var isUser: Bool { message.role == .user }
+
+    var body: some View {
+        HStack {
+            if isUser { Spacer(minLength: 48) }
+
+            VStack(alignment: isUser ? .trailing : .leading, spacing: 6) {
+                if let attachments = message.attachments, !attachments.isEmpty {
+                    ForEach(attachments) { attachment in
+                        Label(attachment.filename, systemImage: "paperclip")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Group {
+                    if isUser {
+                        Text(message.text)
+                    } else if let attributed = try? AttributedString(
+                        markdown: message.text.isEmpty && isStreaming ? "▍" : message.text,
+                        options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+                    ) {
+                        Text(message.text.isEmpty && isStreaming ? AttributedString("▍") : attributed)
+                    } else {
+                        Text(message.text.isEmpty && isStreaming ? "▍" : message.text)
+                    }
+                }
+                .textSelection(.enabled)
+                .padding(12)
+                .background(
+                    isUser ? Color.accentColor.opacity(0.18) : Color(.secondarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                )
+            }
+
+            if !isUser { Spacer(minLength: 48) }
+        }
+    }
+}
