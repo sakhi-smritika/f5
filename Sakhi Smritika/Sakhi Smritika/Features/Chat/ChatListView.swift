@@ -185,15 +185,23 @@ struct ChatListView: View {
 
     private func conversationRow(_ conversation: Conversation, vm: ChatListViewModel) -> some View {
         NavigationLink(value: Route.conversation(conversation.id)) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(conversation.displayTitle)
-                    .font(.body.weight(.medium))
-                    .lineLimit(1)
-                if let updated = conversation.updatedAt {
-                    Text(updated)
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+            HStack(spacing: 10) {
+                if conversation.kbitId != nil {
+                    Image(systemName: "sparkles")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("Knowledge bit discussion")
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(conversation.displayTitle)
+                        .font(.body.weight(.medium))
                         .lineLimit(1)
+                    if let updated = conversation.updatedAt {
+                        Text(updated)
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                    }
                 }
             }
         }

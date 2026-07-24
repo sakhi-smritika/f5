@@ -98,6 +98,10 @@ struct ChatThreadView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 14) {
+                    if let pinned = vm.pinnedKbit {
+                        PinnedKbitCard(bit: pinned)
+                    }
+
                     if vm.isLoading {
                         ProgressView()
                             .frame(maxWidth: .infinity)
@@ -109,11 +113,17 @@ struct ChatThreadView: View {
                             .padding()
                     } else if vm.messages.isEmpty {
                         ContentUnavailableView(
-                            "Ask Sakhi anything",
+                            vm.isKbitDiscussion
+                                ? "Start the discussion"
+                                : "Ask Sakhi anything",
                             systemImage: "sparkles",
-                            description: Text("Send a message to get started.")
+                            description: Text(
+                                vm.isKbitDiscussion
+                                    ? "Add a comment to discuss this with Smritika."
+                                    : "Send a message to get started."
+                            )
                         )
-                        .padding(.top, 48)
+                        .padding(.top, vm.pinnedKbit == nil ? 48 : 12)
                     } else {
                         ForEach(vm.messages) { message in
                             MessageBubbleView(
@@ -233,6 +243,36 @@ struct ChatThreadView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(.ultraThinMaterial)
+    }
+}
+
+struct PinnedKbitCard: View {
+    let bit: KnowledgeBit
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Knowledge Bit")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color.accentColor)
+                .textCase(.uppercase)
+
+            Text(bit.title)
+                .font(.headline)
+
+            Text(bit.content)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.accentColor.opacity(0.35), lineWidth: 1)
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Knowledge Bit: \(bit.title)")
     }
 }
 

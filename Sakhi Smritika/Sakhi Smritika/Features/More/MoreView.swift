@@ -1,79 +1,53 @@
 import SwiftUI
 
-struct MoreView: View {
-    @Environment(AuthService.self) private var authService
-    @State private var showSignOutConfirm = false
-    @State private var path = NavigationPath()
+enum MoreDestination: String, Identifiable {
+    case profile
+    case goals
+    case settings
 
-    private enum Destination: Hashable {
-        case profile
-        case goals
-        case settings
-    }
+    var id: String { rawValue }
+}
+
+/// Compact icon stack matching the web settings / introspection flyout.
+struct MoreMenuView: View {
+    let onSelect: (MoreDestination) -> Void
+    let onSignOut: () -> Void
+
+    private let iconSize: CGFloat = 40
 
     var body: some View {
-        NavigationStack(path: $path) {
-            ScrollView {
-                VStack(spacing: 36) {
-                    moreIconButton(
-                        systemImage: "person.crop.circle",
-                        label: "Profile"
-                    ) {
-                        path.append(Destination.profile)
-                    }
-
-                    moreIconButton(
-                        systemImage: "target",
-                        label: "Goals"
-                    ) {
-                        path.append(Destination.goals)
-                    }
-
-                    moreIconButton(
-                        systemImage: "gearshape",
-                        label: "Settings"
-                    ) {
-                        path.append(Destination.settings)
-                    }
-
-                    Divider()
-                        .frame(width: 48)
-                        .padding(.vertical, 4)
-
-                    moreIconButton(
-                        systemImage: "rectangle.portrait.and.arrow.right",
-                        label: "Log out",
-                        tint: .red
-                    ) {
-                        showSignOutConfirm = true
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.top, 48)
-                .padding(.bottom, 32)
+        VStack(spacing: 4) {
+            moreIconButton(systemImage: "person.crop.circle", label: "Profile") {
+                onSelect(.profile)
             }
-            .navigationTitle("More")
-            .navigationDestination(for: Destination.self) { destination in
-                switch destination {
-                case .profile:
-                    ProfileView()
-                case .goals:
-                    GoalsListView()
-                case .settings:
-                    SettingsView()
-                }
+            moreIconButton(systemImage: "target", label: "Goals") {
+                onSelect(.goals)
             }
-            .confirmationDialog(
-                "Sign out of Sakhi Smritika?",
-                isPresented: $showSignOutConfirm,
-                titleVisibility: .visible
-            ) {
-                Button("Log Out", role: .destructive) {
-                    Task { await authService.signOut() }
-                }
-                Button("Cancel", role: .cancel) {}
+            moreIconButton(systemImage: "gearshape", label: "Settings") {
+                onSelect(.settings)
             }
+
+            Rectangle()
+                .fill(.separator.opacity(0.5))
+                .frame(width: iconSize - 12, height: 1)
+                .padding(.vertical, 2)
+
+            moreIconButton(
+                systemImage: "rectangle.portrait.and.arrow.right",
+                label: "Log out",
+                tint: .red,
+                action: onSignOut
+            )
         }
+        .padding(4)
+        .frame(width: iconSize + 8)
+        .fixedSize()
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(.separator.opacity(0.5), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
     }
 
     private func moreIconButton(
@@ -84,9 +58,9 @@ struct MoreView: View {
     ) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 34, weight: .regular))
+                .font(.system(size: 18, weight: .regular))
                 .foregroundStyle(tint)
-                .frame(width: 64, height: 64)
+                .frame(width: iconSize, height: iconSize)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

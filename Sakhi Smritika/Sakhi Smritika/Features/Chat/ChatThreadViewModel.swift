@@ -7,6 +7,8 @@ import UniformTypeIdentifiers
 final class ChatThreadViewModel {
     /// `nil` means a local draft that creates a conversation on first send/attach.
     var conversationId: UUID?
+    var kbitId: UUID?
+    var pinnedKbit: KnowledgeBit?
     var title: String
     var messages: [ChatMessage] = []
     var draft = ""
@@ -31,6 +33,7 @@ final class ChatThreadViewModel {
         onConversationUpdated: @escaping (Conversation) -> Void
     ) {
         self.conversationId = conversation?.id
+        self.kbitId = conversation?.kbitId
         self.title = conversation?.displayTitle ?? "New chat"
         self.models = models
         self.selectedModelId = selectedModelId
@@ -45,16 +48,37 @@ final class ChatThreadViewModel {
             && !pendingAttachments.contains(where: { $0.isUploading })
     }
 
+    var isKbitDiscussion: Bool {
+        kbitId != nil
+    }
+
     func loadIfNeeded() async {
         guard let conversationId else { return }
         isLoading = true
         loadError = nil
         defer { isLoading = false }
 
+        async let pinnedTask: () = loadPinnedKbitIfNeeded()
         do {
             messages = try await ChatService.loadMessages(api: apiClient, conversationId: conversationId)
         } catch {
             loadError = error.localizedDescription
+        }
+        await pinnedTask
+    }
+
+    private func loadPinnedKbitIfNeeded() async {
+        guard let kbitId else {
+            pinnedKbit = nil
+            return
+        }
+        do {
+            pinnedKbit = try await KbitService.getKbit(id: kbitId)
+            if let pinnedKbit, title == "New chat" || title.isEmpty {
+                title = pinnedKbit.title
+            }
+        } catch {
+            pinnedKbit = nil
         }
     }
 
@@ -134,7 +158,7 @@ final class ChatThreadViewModel {
                         folderId: nil,
                         createdAt: nil,
                         updatedAt: ISO8601DateFormatter().string(from: Date()),
-                        kbitId: nil
+                        kbitId: self.kbitId
                     )
                     self.onConversationUpdated(updated)
                 },

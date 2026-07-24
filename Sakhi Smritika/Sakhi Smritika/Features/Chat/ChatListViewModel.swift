@@ -37,7 +37,7 @@ final class ChatListViewModel {
 
     var unfolderedConversations: [Conversation] {
         conversations
-            .filter { $0.folderId == nil && $0.kbitId == nil }
+            .filter { $0.folderId == nil }
             .sorted { ($0.updatedAt ?? "") > ($1.updatedAt ?? "") }
     }
 
@@ -176,6 +176,9 @@ final class ChatListViewModel {
             }
             if conversation.folderId != nil {
                 merged.folderId = conversation.folderId
+            }
+            if conversation.kbitId != nil {
+                merged.kbitId = conversation.kbitId
             }
             conversations[index] = merged
         } else {
