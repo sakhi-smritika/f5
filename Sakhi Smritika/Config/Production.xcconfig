@@ -3,5 +3,5 @@
 // TODO: Replace placeholders with your production project values.
 SUPABASE_URL = https:/$()/kbkrnzneceroxerupwzn.supabase.co
 SUPABASE_PUBLISHABLE_KEY = sb_publishable_hJtuPUhm8OeQeKGM_pPSQg_tgk3fovV
-BACKEND_URL = https:/$()/sakhismritika.space
+BACKEND_URL = https:/$()/railway.sakhismritika.space
 APP_ENVIRONMENT = Production
