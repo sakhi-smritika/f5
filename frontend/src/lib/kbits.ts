@@ -62,7 +62,7 @@ export type StageStrategies = {
 
 export type StrategyCatalog = {
   query: StageStrategies
-  source: StageStrategies
+  generator: StageStrategies
   screen: StageStrategies
   rank: StageStrategies
 }
@@ -79,7 +79,7 @@ export type InvokeOptions = {
   goalId?: string | null
   count?: number
   queryStrategy?: string | null
-  sourceStrategy?: string | null
+  generatorStrategy?: string | null
   screenStrategy?: string | null
   rankStrategy?: string | null
 }
@@ -89,7 +89,7 @@ export async function invokeKbits(options: InvokeOptions = {}): Promise<Knowledg
   if (options.goalId) body.goal_id = options.goalId
   if (options.count) body.count = options.count
   if (options.queryStrategy) body.query_strategy = options.queryStrategy
-  if (options.sourceStrategy) body.source_strategy = options.sourceStrategy
+  if (options.generatorStrategy) body.generator_strategy = options.generatorStrategy
   if (options.screenStrategy) body.screen_strategy = options.screenStrategy
   if (options.rankStrategy) body.rank_strategy = options.rankStrategy
 

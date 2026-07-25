@@ -16,7 +16,7 @@ final class KbitsFeedViewModel {
     var showGenerateOptions = false
     var generateCount = 5
     var queryStrategy = ""
-    var sourceStrategy = ""
+    var generatorStrategy = ""
     var screenStrategy = ""
     var rankStrategy = ""
 
@@ -58,7 +58,7 @@ final class KbitsFeedViewModel {
 
         var body = InvokeKbitsBody(count: generateCount)
         body.queryStrategy = queryStrategy.nilIfEmpty
-        body.sourceStrategy = sourceStrategy.nilIfEmpty
+        body.generatorStrategy = generatorStrategy.nilIfEmpty
         body.screenStrategy = screenStrategy.nilIfEmpty
         body.rankStrategy = rankStrategy.nilIfEmpty
 

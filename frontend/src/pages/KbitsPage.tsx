@@ -23,7 +23,7 @@ import {
 import { KbitComments } from '../components/kbits/KbitComments'
 import './KbitsPage.css'
 
-const STAGES = ['query', 'source', 'screen', 'rank'] as const
+const STAGES = ['query', 'generator', 'screen', 'rank'] as const
 type Stage = (typeof STAGES)[number]
 
 export function KbitsPage() {
@@ -36,7 +36,7 @@ export function KbitsPage() {
   const [catalog, setCatalog] = useState<StrategyCatalog | null>(null)
   const [selected, setSelected] = useState<Record<Stage, string>>({
     query: '',
-    source: '',
+    generator: '',
     screen: '',
     rank: '',
   })
@@ -140,7 +140,7 @@ export function KbitsPage() {
       const created = await invokeKbits({
         count,
         queryStrategy: selected.query || undefined,
-        sourceStrategy: selected.source || undefined,
+        generatorStrategy: selected.generator || undefined,
         screenStrategy: selected.screen || undefined,
         rankStrategy: selected.rank || undefined,
       })

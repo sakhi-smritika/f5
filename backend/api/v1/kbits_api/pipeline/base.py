@@ -5,10 +5,12 @@ algorithm sharing one fixed input/output contract. Many strategies can be
 registered per stage; one is the default. The orchestrator resolves each stage
 by name (from the request or the registered default) and chains them:
 
-    build(query) -> search(source) -> screen -> rank -> insert
+    build(query) -> generate -> screen -> rank -> insert
 
 Adding a new algorithm means writing a class that satisfies the stage's
-``Protocol`` and registering it. Nothing else in the pipeline changes.
+``Protocol`` and registering it. Nothing else in the pipeline changes. The query
+and generate stages are awaited (they call agents and models); screen and rank
+are pure in-process transforms.
 """
 
 from __future__ import annotations
@@ -19,18 +21,27 @@ from typing import Generic, Protocol, TypeVar, runtime_checkable
 
 @dataclass
 class Query:
-    """What to look for and what to avoid, produced by a ``QueryStrategy``."""
+    """What kind of bits the user needs, produced by a ``QueryStrategy``.
+
+    ``include`` and ``exclude`` are short terms: the rank stage scores candidates
+    against ``include``, and the screen stage treats ``exclude`` as redundant
+    ground. ``brief`` is optional prose — an agent-built query uses it to explain
+    what this user needs right now, which terms alone cannot carry.
+    """
 
     include: list[str] = field(default_factory=list)
     exclude: list[str] = field(default_factory=list)
+    brief: str = ""
 
     def to_text(self) -> str:
-        """Flatten the query into plain text for a text/LLM-based source."""
+        """Flatten the query into plain text for a text/LLM-based generator."""
         parts: list[str] = []
         if self.include:
             parts.append("Focus on: " + "; ".join(self.include))
         if self.exclude:
             parts.append("Avoid repeating: " + "; ".join(self.exclude))
+        if self.brief:
+            parts.append("What this user needs right now:\n" + self.brief)
         return "\n".join(parts)
 
 
@@ -48,6 +59,8 @@ class PipelineContext:
     """Shared, read-only inputs available to every strategy in one invoke.
 
     Loaded once by the orchestrator so strategies never re-query the database.
+    Agent-backed strategies read live data through tools instead and only need
+    ``user_id``, ``goal_id`` and ``count`` from here.
     """
 
     user_id: str
@@ -63,16 +76,20 @@ class PipelineContext:
 
 @runtime_checkable
 class QueryStrategy(Protocol):
-    """Turn user context into a ``Query``."""
+    """Work out what kind of bits the user needs right now.
 
-    def build(self, ctx: PipelineContext) -> Query: ...
+    Awaited so a strategy can be an agent that reads the user's goals, diary,
+    calendar and existing bits through tools.
+    """
+
+    async def build(self, ctx: PipelineContext) -> Query: ...
 
 
 @runtime_checkable
-class SourceStrategy(Protocol):
-    """Fetch raw candidate bits for a query (the Source of Knowledge)."""
+class GeneratorStrategy(Protocol):
+    """Produce candidate bits for a query."""
 
-    def search(self, query: Query, limit: int) -> list[KBCandidate]: ...
+    async def generate(self, query: Query, limit: int) -> list[KBCandidate]: ...
 
 
 @runtime_checkable

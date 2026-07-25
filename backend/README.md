@@ -54,6 +54,7 @@ api/
     chat.py             # /api/v1/chat endpoints (conversations, messages, SSE streaming)
 agent/
   agent.py              # ADK LlmAgent (LiteLLM, multi-provider) + cached DatabaseSessionService & Runner
+  kbit_query_agent.py   # Read-only agent for the kbits `agent` query strategy (in-memory sessions)
 config/
   supabase.py           # get_supabase_client() + get_supabase_service_client() (service-role)
   auth.py               # get_current_user() dependency + AuthenticatedUser

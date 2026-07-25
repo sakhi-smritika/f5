@@ -28,7 +28,7 @@ def list_strategies() -> dict:
 
 
 @router.post("/invoke")
-def invoke(
+async def invoke(
     body: InvokeBody,
     user: AuthenticatedUser = Depends(get_current_user),
 ) -> dict:
@@ -40,12 +40,12 @@ def invoke(
     count = max(1, min(count, MAX_INVOKE_COUNT))
 
     try:
-        bits = invoke_kbits(
+        bits = await invoke_kbits(
             user.id,
             goal_id=body.goal_id,
             count=count,
             query_strategy=body.query_strategy,
-            source_strategy=body.source_strategy,
+            generator_strategy=body.generator_strategy,
             screen_strategy=body.screen_strategy,
             rank_strategy=body.rank_strategy,
         )

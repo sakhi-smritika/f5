@@ -44,7 +44,7 @@ struct StageStrategies: Codable, Sendable {
 
 struct StrategyCatalog: Codable, Sendable {
     let query: StageStrategies
-    let source: StageStrategies
+    let generator: StageStrategies
     let screen: StageStrategies
     let rank: StageStrategies
 }
@@ -53,7 +53,7 @@ struct InvokeKbitsBody: Encodable, Sendable {
     var goalId: UUID? = nil
     var count: Int? = nil
     var queryStrategy: String? = nil
-    var sourceStrategy: String? = nil
+    var generatorStrategy: String? = nil
     var screenStrategy: String? = nil
     var rankStrategy: String? = nil
 
@@ -61,7 +61,7 @@ struct InvokeKbitsBody: Encodable, Sendable {
         case goalId = "goal_id"
         case count
         case queryStrategy = "query_strategy"
-        case sourceStrategy = "source_strategy"
+        case generatorStrategy = "generator_strategy"
         case screenStrategy = "screen_strategy"
         case rankStrategy = "rank_strategy"
     }
@@ -73,8 +73,8 @@ struct InvokeKbitsBody: Encodable, Sendable {
         if let queryStrategy, !queryStrategy.isEmpty {
             try container.encode(queryStrategy, forKey: .queryStrategy)
         }
-        if let sourceStrategy, !sourceStrategy.isEmpty {
-            try container.encode(sourceStrategy, forKey: .sourceStrategy)
+        if let generatorStrategy, !generatorStrategy.isEmpty {
+            try container.encode(generatorStrategy, forKey: .generatorStrategy)
         }
         if let screenStrategy, !screenStrategy.isEmpty {
             try container.encode(screenStrategy, forKey: .screenStrategy)

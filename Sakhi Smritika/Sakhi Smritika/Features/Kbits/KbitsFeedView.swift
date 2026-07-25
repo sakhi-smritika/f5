@@ -137,7 +137,7 @@ struct GenerateKbitsSheet: View {
 
                 if let catalog = viewModel.catalog {
                     strategyPicker("Query", selection: $viewModel.queryStrategy, stage: catalog.query)
-                    strategyPicker("Source", selection: $viewModel.sourceStrategy, stage: catalog.source)
+                    strategyPicker("Generator", selection: $viewModel.generatorStrategy, stage: catalog.generator)
                     strategyPicker("Screen", selection: $viewModel.screenStrategy, stage: catalog.screen)
                     strategyPicker("Rank", selection: $viewModel.rankStrategy, stage: catalog.rank)
                 } else {

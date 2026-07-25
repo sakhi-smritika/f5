@@ -2,7 +2,7 @@
 
 ``invoke_kbits`` loads the shared context once, resolves each stage's strategy by
 name (falling back to the registered default), runs
-build -> search -> screen -> rank, then inserts the results.
+build -> generate -> screen -> rank, then inserts the results.
 """
 
 from __future__ import annotations
@@ -10,13 +10,14 @@ from __future__ import annotations
 import logging
 import uuid
 
+from agent.tools.context import current_user_id
 from config.supabase import get_supabase_service_client
 
 from .base import KBCandidate, PipelineContext
+from .generators import GENERATOR_STRATEGIES
 from .query import QUERY_STRATEGIES
 from .ranker import RANK_STRATEGIES
 from .screener import SCREEN_STRATEGIES
-from .sources import SOURCE_STRATEGIES
 
 logger = logging.getLogger(__name__)
 
@@ -64,13 +65,13 @@ def build_context(user_id: str, goal_id: str | None, count: int) -> PipelineCont
     )
 
 
-def invoke_kbits(
+async def invoke_kbits(
     user_id: str,
     *,
     goal_id: str | None = None,
     count: int = 5,
     query_strategy: str | None = None,
-    source_strategy: str | None = None,
+    generator_strategy: str | None = None,
     screen_strategy: str | None = None,
     rank_strategy: str | None = None,
 ) -> list[dict]:
@@ -79,14 +80,22 @@ def invoke_kbits(
     Raises ``KeyError`` if any strategy name is unknown (mapped to 422 upstream).
     """
     query_algo = QUERY_STRATEGIES.get(query_strategy)
-    source_algo = SOURCE_STRATEGIES.get(source_strategy)
+    generator_algo = GENERATOR_STRATEGIES.get(generator_strategy)
     screen_algo = SCREEN_STRATEGIES.get(screen_strategy)
     rank_algo = RANK_STRATEGIES.get(rank_strategy)
 
     ctx = build_context(user_id, goal_id, count)
 
-    query = query_algo.build(ctx)
-    candidates = source_algo.search(query, count)
+    # Agent-backed strategies run tools that read the signed-in user from this
+    # context var rather than taking a user id argument, so the model can never
+    # reach another user's data.
+    token = current_user_id.set(user_id)
+    try:
+        query = await query_algo.build(ctx)
+        candidates = await generator_algo.generate(query, count)
+    finally:
+        current_user_id.reset(token)
+
     candidates = screen_algo.screen(candidates, ctx)
     candidates = rank_algo.rank(candidates, query)
     candidates = candidates[:count]

@@ -21,9 +21,10 @@ rewriting the idea).
 ## The journey
 
 1. You ask for new bits (optionally about a specific goal, and how many).
-2. The system builds a **query** from your goals and profile — what to seek, and
-   what to avoid repeating.
-3. It **sources** candidate bits, **screens** out duplicates/noise, and **ranks**
+2. The system builds a **query** — what kind of knowledge you need right now, and
+   what to avoid repeating. This can be a simple read of your goals and profile,
+   or an agent that looks at your goals, days, calendar and past reactions.
+3. It **generates** candidate bits, **screens** out duplicates/noise, and **ranks**
    them by relevance.
 4. The top few are saved to your **feed**.
 5. You read them and **react**: mark read, like/dislike, rate, or mark relevance.
@@ -31,7 +32,7 @@ rewriting the idea).
 
 ```mermaid
 flowchart LR
-    Q[Build query<br/>from goals + profile] --> S[Source<br/>candidate bits]
+    Q[Build query<br/>what you need now] --> S[Generate<br/>candidate bits]
     S --> SC[Screen<br/>dedupe / filter]
     SC --> R[Rank<br/>by relevance]
     R --> F[(Your feed<br/>top few saved)]
@@ -46,9 +47,9 @@ Generation needs server-side logic and model access, so it runs through the
 you are and only ever reads *your* goals and profile to build the query. Reading
 and reacting to the feed afterward is lighter and personal.
 
-The pipeline is a fixed sequence of **stages** — *query → source → screen → rank →
-save* — each with a named strategy that can be replaced (e.g. a smarter ranker, or
-a web-search-backed source in the future). This staged design is one of the
+The pipeline is a fixed sequence of **stages** — *query → generate → screen → rank
+→ save* — each with a named strategy that can be replaced (e.g. a smarter ranker,
+or a web-grounded generator in the future). This staged design is one of the
 cleaner patterns in the system and a natural place to grow the product's
 intelligence.
 
@@ -70,9 +71,9 @@ one, or record a reaction on your behalf — see [04-the-agent.md](04-the-agent.
   point is to finish and apply, not to scroll.
 - **It doesn't invent links to goals it can't verify.** A bit is only attached to a
   goal that's actually yours.
-- **It doesn't claim live-web truth by default.** The current source generates from
-  the model; a grounded web-search source is a designed-for extension, not a
-  present guarantee. Treat bits as prompts to think, not cited facts.
+- **It doesn't claim live-web truth by default.** The current generator writes from
+  the model; a web-grounded generator is a designed-for extension, not a present
+  guarantee. Treat bits as prompts to think, not cited facts.
 - **Your reactions are signals, not scores you're graded on.** They exist to make
   the next round more relevant to you.
 

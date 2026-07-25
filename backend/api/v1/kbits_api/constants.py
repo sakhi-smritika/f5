@@ -1,6 +1,6 @@
 """Shared constants for the Knowledge Bits API."""
 
-# How many bits a single invoke asks the source for, and the hard ceiling.
+# How many bits a single invoke asks the generator for, and the hard ceiling.
 DEFAULT_INVOKE_COUNT = 5
 MAX_INVOKE_COUNT = 20
 

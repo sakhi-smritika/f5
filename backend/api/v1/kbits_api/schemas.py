@@ -18,7 +18,7 @@ class InvokeBody(BaseModel):
     goal_id: str | None = None
     count: int | None = None
     query_strategy: str | None = None
-    source_strategy: str | None = None
+    generator_strategy: str | None = None
     screen_strategy: str | None = None
     rank_strategy: str | None = None
 

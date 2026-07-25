@@ -1,8 +1,9 @@
 """
-Assembles the ADK tools exposed to the assistant.
+Assembles the ADK tools exposed to the agents.
 
-Kept as a flat ``ALL_TOOLS`` list. Grouping/selection can be layered on later
-without changing the underlying tool functions.
+``ALL_TOOLS`` is the full set the chat assistant gets. ``KBIT_QUERY_TOOLS`` is a
+read-only subset for the knowledge-bit query agent. Both are built from the same
+tool functions, so a fix to a tool applies everywhere it is exposed.
 """
 
 from google.adk.tools import FunctionTool
@@ -70,4 +71,27 @@ ALL_TOOLS: list[FunctionTool] = [
     FunctionTool(list_tasks),
     FunctionTool(create_task),
     FunctionTool(complete_task),
+]
+
+# Read-only tools for the knowledge-bit query agent, which reads the user's
+# current situation to work out what kind of bits they need. Writes are excluded
+# so query building can never mutate data — in particular ``create_kbit``, which
+# would insert bits straight into the feed and bypass the screen and rank stages.
+KBIT_QUERY_TOOLS: list[FunctionTool] = [
+    # Goals — what the user is working toward
+    FunctionTool(list_my_goals),
+    FunctionTool(get_goal),
+    FunctionTool(list_child_goals),
+    FunctionTool(search_goals),
+    # Knowledge Bits — what the user has already been shown
+    FunctionTool(list_recent_kbits),
+    FunctionTool(get_knowledge_bit),
+    FunctionTool(search_kbits),
+    # Diary — how the user's days are actually going
+    FunctionTool(get_recent_diary_entries),
+    FunctionTool(search_diary),
+    FunctionTool(get_diary_entry),
+    # Google — what the user's upcoming time and to-dos look like
+    FunctionTool(list_calendar_events),
+    FunctionTool(list_tasks),
 ]
