@@ -22,6 +22,36 @@ struct ChatThreadView: View {
         }
         .navigationTitle(viewModel?.title ?? conversation?.displayTitle ?? "New chat")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if let viewModel, viewModel.models.count > 1 {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Picker("Model", selection: Binding(
+                            get: { viewModel.selectedModelId },
+                            set: { id in
+                                viewModel.selectedModelId = id
+                                listViewModel.selectModel(id)
+                            }
+                        )) {
+                            ForEach(viewModel.models) { model in
+                                Text(model.label).tag(model.id)
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "cpu")
+                    }
+                    .accessibilityLabel("Model: \(viewModel.selectedModelLabel)")
+                }
+            }
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") {
+                    composerFocused = false
+                }
+            }
+        }
         .task {
             if viewModel == nil {
                 viewModel = ChatThreadViewModel(
@@ -137,6 +167,10 @@ struct ChatThreadView: View {
                 }
                 .padding(16)
             }
+            .scrollDismissesKeyboard(.interactively)
+            .onTapGesture {
+                composerFocused = false
+            }
             .onChange(of: vm.messages) { _, messages in
                 if let last = messages.last?.id {
                     withAnimation(.easeOut(duration: 0.2)) {
@@ -195,18 +229,6 @@ struct ChatThreadView: View {
                 }
             }
 
-            if vm.models.count > 1 {
-                Picker("Model", selection: $vm.selectedModelId) {
-                    ForEach(vm.models) { model in
-                        Text(model.label).tag(model.id)
-                    }
-                }
-                .pickerStyle(.menu)
-                .onChange(of: vm.selectedModelId) { _, id in
-                    listViewModel.selectModel(id)
-                }
-            }
-
             HStack(alignment: .bottom, spacing: 10) {
                 Menu {
                     PhotosPicker(selection: $photoItems, maxSelectionCount: 4, matching: .images) {
@@ -230,7 +252,19 @@ struct ChatThreadView: View {
                     .padding(12)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
 
+                if composerFocused {
+                    Button {
+                        composerFocused = false
+                    } label: {
+                        Image(systemName: "keyboard.chevron.compact.down")
+                            .font(.title3)
+                            .frame(width: 36, height: 36)
+                    }
+                    .accessibilityLabel("Hide keyboard")
+                }
+
                 Button {
+                    composerFocused = false
                     Task { await vm.send() }
                 } label: {
                     Image(systemName: "arrow.up.circle.fill")
@@ -295,27 +329,20 @@ struct MessageBubbleView: View {
                     }
                 }
 
-                Group {
-                    if isUser {
-                        Text(message.text)
-                    } else if let attributed = try? AttributedString(
-                        markdown: message.text.isEmpty && isStreaming ? "▍" : message.text,
-                        options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-                    ) {
-                        Text(message.text.isEmpty && isStreaming ? AttributedString("▍") : attributed)
-                    } else {
-                        Text(message.text.isEmpty && isStreaming ? "▍" : message.text)
-                    }
+                if isUser {
+                    Text(message.text)
+                        .textSelection(.enabled)
+                        .padding(12)
+                        .background(
+                            Color.accentColor.opacity(0.18),
+                            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        )
+                } else {
+                    ChatMarkdownView(text: message.text, isStreaming: isStreaming)
                 }
-                .textSelection(.enabled)
-                .padding(12)
-                .background(
-                    isUser ? Color.accentColor.opacity(0.18) : Color(.secondarySystemGroupedBackground),
-                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-                )
             }
 
-            if !isUser { Spacer(minLength: 48) }
+            if !isUser { Spacer(minLength: 0) }
         }
     }
 }

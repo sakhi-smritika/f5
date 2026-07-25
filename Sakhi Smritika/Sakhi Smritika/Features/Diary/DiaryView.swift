@@ -110,11 +110,25 @@ struct DiaryView: View {
                 TextField(placeholder, text: text, axis: .vertical)
                     .lineLimit(4...12)
                     .padding(14)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .background(
+                        Color(.tertiarySystemFill),
+                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+                    )
                     .onChange(of: text.wrappedValue) { _, _ in onEdit() }
             }
         }
         .padding(16)
-        .background(.background, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(
+            Color(.secondarySystemGroupedBackground),
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
+        )
     }
 }

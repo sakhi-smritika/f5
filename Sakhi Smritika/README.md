@@ -45,3 +45,7 @@ Phase 3 ships: **Chat** — conversation list (new / folders / chats), lazy crea
 Phase 4 ships: **Kbits** — Instagram Reels-style vertical pager, in-card scroll for long content, generate + strategies, interactions, discussion bottom sheet.
 
 Phase 5 ships: **Settings** — Google Calendar/Tasks connect & disconnect via `ASWebAuthenticationSession`. Callback scheme: `sakhi-smritika://oauth` (allowlisted in the backend alongside the web success redirect).
+
+Assistant chat replies use **MarkdownUI** for normal markdown. When `$` / `$$` / `\\( \\)` / `\\[ \\]` math is present, a single **WKWebView** renders markdown-it + KaTeX together (inline math stays in the sentence). CDN load needs network once.
+
+If Xcode shows **Missing package product 'MarkdownUI'**: File → Add Package Dependencies… → `https://github.com/gonzalezreal/swift-markdown-ui` → add product **MarkdownUI** to the Sakhi Smritika target → Resolve Package Versions.

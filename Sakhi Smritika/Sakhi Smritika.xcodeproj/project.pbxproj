@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1B7476DA3014AF050090EA21 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = 1B7476DB3014AF050090EA21 /* MarkdownUI */; };
 		A1B2C3D4010000080062F7A8 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D4010000070062F7A8 /* Supabase */; };
 		A1B2C3D4010000090062F7A8 /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D40100000A0062F7A8 /* Auth */; };
 /* End PBXBuildFile section */
@@ -63,6 +64,7 @@
 			files = (
 				A1B2C3D4010000080062F7A8 /* Supabase in Frameworks */,
 				A1B2C3D4010000090062F7A8 /* Auth in Frameworks */,
+				1B7476DA3014AF050090EA21 /* MarkdownUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -137,6 +139,7 @@
 			packageProductDependencies = (
 				A1B2C3D4010000070062F7A8 /* Supabase */,
 				A1B2C3D40100000A0062F7A8 /* Auth */,
+				1B7476DB3014AF050090EA21 /* MarkdownUI */,
 			);
 			productName = "Sakhi Smritika";
 			productReference = 1BE1D2783013E9950062F7A8 /* Sakhi Smritika.app */;
@@ -222,6 +225,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				A1B2C3D4010000060062F7A8 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+				1B7476D93014AF050090EA21 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1BE1D2793013E9950062F7A8 /* Products */;
@@ -606,6 +610,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		1B7476D93014AF050090EA21 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/gonzalezreal/swift-markdown-ui";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.4.1;
+			};
+		};
 		A1B2C3D4010000060062F7A8 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/supabase/supabase-swift.git";
@@ -617,6 +629,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		1B7476DB3014AF050090EA21 /* MarkdownUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1B7476D93014AF050090EA21 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
+			productName = MarkdownUI;
+		};
 		A1B2C3D4010000070062F7A8 /* Supabase */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = A1B2C3D4010000060062F7A8 /* XCRemoteSwiftPackageReference "supabase-swift" */;

@@ -52,6 +52,12 @@ final class ChatThreadViewModel {
         kbitId != nil
     }
 
+    var selectedModelLabel: String {
+        models.first(where: { $0.id == selectedModelId })?.label
+            ?? models.first?.label
+            ?? "Model"
+    }
+
     func loadIfNeeded() async {
         guard let conversationId else { return }
         isLoading = true
@@ -128,13 +134,15 @@ final class ChatThreadViewModel {
         }
         pendingAttachments = []
 
+        // Show the user bubble immediately; stream the assistant reply after.
+        messages.append(
+            ChatMessage(role: .user, text: text, attachments: chatAttachments.isEmpty ? nil : chatAttachments)
+        )
+        messages.append(ChatMessage(role: .assistant, text: ""))
+        isStreaming = true
+
         do {
             let id = try await ensureConversation()
-            messages.append(
-                ChatMessage(role: .user, text: text, attachments: chatAttachments.isEmpty ? nil : chatAttachments)
-            )
-            messages.append(ChatMessage(role: .assistant, text: ""))
-            isStreaming = true
 
             await ChatService.streamMessage(
                 api: apiClient,
@@ -176,6 +184,11 @@ final class ChatThreadViewModel {
         } catch {
             isStreaming = false
             sendError = error.localizedDescription
+            if let last = messages.indices.last,
+               messages[last].role == .assistant,
+               messages[last].text.isEmpty {
+                messages.removeLast()
+            }
         }
     }
 

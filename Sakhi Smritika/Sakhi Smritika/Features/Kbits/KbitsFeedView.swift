@@ -104,7 +104,6 @@ struct KbitsFeedView: View {
                 }
                 .scrollTargetBehavior(.paging)
                 .scrollIndicators(.hidden)
-                .ignoresSafeArea(edges: .bottom)
                 .refreshable { await vm.load() }
             }
 

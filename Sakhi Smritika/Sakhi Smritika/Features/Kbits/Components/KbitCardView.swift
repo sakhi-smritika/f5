@@ -37,7 +37,7 @@ struct KbitCardView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .textSelection(.enabled)
 
-                        Spacer(minLength: 88)
+                        Spacer(minLength: 100)
                     }
                     .padding(20)
                     .padding(.bottom, 24)
@@ -47,7 +47,7 @@ struct KbitCardView: View {
 
                 actionBar
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 12)
+                    .padding(.bottom, 16)
             }
             .background(Color(.systemBackground))
             .onAppear(perform: onBecameVisible)
