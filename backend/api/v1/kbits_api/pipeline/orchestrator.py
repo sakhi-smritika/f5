@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import uuid
 
-from agent.tools.context import current_user_id
+from tools.context import current_user_id
 from config.supabase import get_supabase_service_client
 
 from .base import KBCandidate, PipelineContext

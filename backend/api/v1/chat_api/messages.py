@@ -5,9 +5,9 @@ from fastapi.responses import StreamingResponse
 from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.genai import types
 
-from agent.agent import APP_NAME, get_runner, get_session_service
-from agent.attachment_parts import build_user_message_parts, is_attachment_text
-from agent.tools.context import (
+from agent.chat_agent import APP_NAME, get_runner, get_session_service
+from agent.utils.attachment_parts import build_user_message_parts, is_attachment_text
+from tools.context import (
     current_kbit,
     current_location_label,
     current_now_label,

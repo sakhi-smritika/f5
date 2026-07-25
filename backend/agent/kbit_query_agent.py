@@ -28,8 +28,8 @@ from google.adk.sessions import InMemorySessionService
 from google.adk.tools import FunctionTool
 from google.genai import types
 
-from agent.tools.context import require_user_id
-from agent.tools.registry import KBIT_QUERY_TOOLS
+from tools.context import require_user_id
+from tools.registry import KBIT_QUERY_TOOLS
 from config.llm_keys import get_api_key_for_model
 from config.models import get_default_model_id
 

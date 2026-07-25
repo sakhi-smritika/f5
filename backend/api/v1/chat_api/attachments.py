@@ -2,7 +2,7 @@ import logging
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
-from agent.agent import APP_NAME, get_session_service
+from agent.chat_agent import APP_NAME, get_session_service
 from config.auth import AuthenticatedUser, get_current_user
 from config.chat_attachments import (
     attachment_row_to_api,

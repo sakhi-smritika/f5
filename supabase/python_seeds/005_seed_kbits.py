@@ -10,7 +10,7 @@ mirroring 002_seed_conversations: a ``conversations`` row linked to the bit via
 ``kbit_id`` plus an ADK session, then the LlmAgent + Runner replays each user
 comment so the agent persists both the comment and its reply. The bit itself is
 injected into the agent's instruction (never stored as a message), matching the
-runtime behaviour in ``agent.agent``.
+runtime behaviour in ``agent.chat_agent``.
 
 The discussion flow only runs when at least one bit has comments, so seeding
 bits without comments needs neither ``OPENAI_API_KEY`` nor ``DATABASE_URL``.
@@ -114,7 +114,7 @@ def get_session_service() -> DatabaseSessionService:
 def build_kbit_agent(api_key: str, *, title: str, content: str) -> LlmAgent:
     """Build an agent whose instruction embeds the bit under discussion.
 
-    This mirrors the discussion framing that ``agent.agent`` injects at runtime,
+    This mirrors the discussion framing that ``agent.chat_agent`` injects at runtime,
     so seeded replies read the same as live ones.
     """
     instruction = (

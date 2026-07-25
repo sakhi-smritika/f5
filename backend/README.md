@@ -53,7 +53,7 @@ api/
     router.py           # /api/v1 router (all routes require auth); sample GET /hello; mounts chat
     chat.py             # /api/v1/chat endpoints (conversations, messages, SSE streaming)
 agent/
-  agent.py              # ADK LlmAgent (LiteLLM, multi-provider) + cached DatabaseSessionService & Runner
+  chat_agent.py         # ADK LlmAgent (LiteLLM, multi-provider) + cached DatabaseSessionService & Runner
   kbit_query_agent.py   # Read-only agent for the kbits `agent` query strategy (in-memory sessions)
 config/
   supabase.py           # get_supabase_client() + get_supabase_service_client() (service-role)
@@ -89,13 +89,13 @@ tests/
 
 ## Chatbot (ADK)
 
-The chat feature is powered by [Google ADK](https://adk.dev). `agent/agent.py` defines an `LlmAgent` backed by LiteLLM (OpenAI, Gemini, Anthropic), plus cached singletons for a `DatabaseSessionService` and a `Runner`.
+The chat feature is powered by [Google ADK](https://adk.dev). `agent/chat_agent.py` defines an `LlmAgent` backed by LiteLLM (OpenAI, Gemini, Anthropic), plus cached singletons for a `DatabaseSessionService` and a `Runner`.
 
 - **Persistence (hybrid):** a conversation is an ADK *session*; its messages are ADK *events*, persisted by `DatabaseSessionService` in the Postgres database pointed at by `DATABASE_URL`. ADK auto-creates its own tables (`sessions`, `events`, `app_states`, `user_states`) on first use. A small `conversations` table (see `supabase/`) stores sidebar metadata (title, timestamps) for the history list.
 - **Isolation:** every session is keyed by the authenticated Supabase `user_id`; ownership of `conversations` rows is checked on each request. Metadata writes use the service-role client (`get_supabase_service_client`).
 - **Streaming:** `POST .../messages` runs the agent with `StreamingMode.SSE` and forwards partial text deltas to the browser as Server-Sent Events, followed by a terminal `{"done": true, "title": ...}` frame.
-- **MCP servers:** add `McpToolset(...)` entries to the agent's `tools` list in `agent/agent.py` to connect Model Context Protocol servers (none are wired up yet).
-- **File attachments:** files are uploaded before send to the private `chat-attachments` Supabase Storage bucket, tracked in the `chat_attachments` table, and linked to their ADK user event on send (`adk_event_id`). On send, the backend normalizes each file into GenAI `Part`s (`config/chat_attachments.py`, `agent/attachment_parts.py`): images and (for Gemini) PDFs are passed inline; other PDFs and text/code files are extracted to text so any provider can read them.
+- **MCP servers:** add `McpToolset(...)` entries to the agent's `tools` list in `agent/chat_agent.py` to connect Model Context Protocol servers (none are wired up yet).
+- **File attachments:** files are uploaded before send to the private `chat-attachments` Supabase Storage bucket, tracked in the `chat_attachments` table, and linked to their ADK user event on send (`adk_event_id`). On send, the backend normalizes each file into GenAI `Part`s (`config/chat_attachments.py`, `agent/utils/attachment_parts.py`): images and (for Gemini) PDFs are passed inline; other PDFs and text/code files are extracted to text so any provider can read them.
 
 ## Logging
 

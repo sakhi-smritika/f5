@@ -12,7 +12,7 @@ and Tasks:
 * Encrypting/decrypting refresh tokens at rest with Fernet.
 
 None of these functions touch the database; persistence lives in
-``agent.tools.google_client``.
+``tools.google_tools.google_client``.
 """
 
 import base64

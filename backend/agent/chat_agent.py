@@ -1,5 +1,5 @@
 """
-ADK agent definition plus cached singletons for the session service and runner.
+Chat agent definition plus cached singletons for the session service and runner.
 
 The agent uses LiteLLM-backed models and persists every conversation
 (session + events) in the Supabase Postgres database via ADK's
@@ -15,13 +15,13 @@ from google.adk.models.lite_llm import LiteLlm
 from google.adk.runners import Runner
 from google.adk.sessions import DatabaseSessionService
 
-from agent.profile_context import build_profile_instruction_context
-from agent.tools.context import (
+from agent.utils.profile_context import build_profile_instruction_context
+from tools.context import (
     current_kbit,
     current_location_label,
     current_now_label,
 )
-from agent.tools.registry import ALL_TOOLS
+from tools.registry import ALL_TOOLS
 from config.llm_keys import get_api_key_for_model
 from config.models import get_default_model_id
 
@@ -113,11 +113,11 @@ def _instruction_provider(_ctx) -> str:
     return INSTRUCTION + "\n\n" + "\n\n".join(extras)
 
 
-def build_agent(model_id: str | None = None) -> LlmAgent:
-    """Create the root agent.
+def build_chat_agent(model_id: str | None = None) -> LlmAgent:
+    """Create the chat assistant agent.
 
     Tools are plain Python functions wrapped as ADK ``FunctionTool``s in
-    ``agent.tools.registry``. To connect MCP servers later, add ``McpToolset(...)``
+    ``tools.registry``. To connect MCP servers later, add ``McpToolset(...)``
     entries alongside them:
 
         from google.adk.tools.mcp_tool import McpToolset, StreamableHTTPConnectionParams
@@ -155,7 +155,7 @@ def get_session_service() -> DatabaseSessionService:
 def _get_runner(model_id: str) -> Runner:
     """Cached ``Runner`` wiring the agent to the persistent session service."""
     return Runner(
-        agent=build_agent(model_id),
+        agent=build_chat_agent(model_id),
         app_name=APP_NAME,
         session_service=get_session_service(),
     )

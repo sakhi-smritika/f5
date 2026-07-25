@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from google.auth.transport.requests import Request
 
-from agent.tools.google_tools.google_client import (
+from tools.google_tools.google_client import (
     delete_connection,
     get_connection,
     get_google_credentials,
@@ -36,7 +36,7 @@ from config.google_oauth import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/integrations", tags=["integrations"])
+router = APIRouter(prefix="/google", tags=["integrations", "google"])
 
 # Mounted on the app directly (no bearer auth) — see ``app.py``.
 callback_router = APIRouter(tags=["integrations"])
@@ -58,7 +58,7 @@ def _redirect_with_status(
     return RedirectResponse(url=f"{base}?{urlencode(params)}", status_code=302)
 
 
-@router.get("/google/authorize")
+@router.get("/authorize")
 def google_authorize(
     user: AuthenticatedUser = Depends(get_current_user),
     success_redirect: str | None = Query(default=None),
@@ -174,7 +174,7 @@ def google_callback(
     return _redirect_with_status(success=True, success_redirect=success_redirect)
 
 
-@router.get("/google/status")
+@router.get("/status")
 def google_status(user: AuthenticatedUser = Depends(get_current_user)) -> dict:
     """Return whether the user has connected Google and which account."""
     row = get_connection(user.id)
@@ -187,7 +187,7 @@ def google_status(user: AuthenticatedUser = Depends(get_current_user)) -> dict:
     }
 
 
-@router.delete("/google", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("", status_code=status.HTTP_204_NO_CONTENT)
 def google_disconnect(user: AuthenticatedUser = Depends(get_current_user)) -> None:
     """Revoke stored tokens and remove the user's Google connection."""
     creds = get_google_credentials(user.id)

@@ -12,7 +12,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from api.v1.integrations import callback_router as google_callback_router
+from api.v1.integrations_api import google_callback_router
 from api.v1.router import router as v1_router
 from config.logger import setup_logging
 from config.middleware import RequestLoggingMiddleware

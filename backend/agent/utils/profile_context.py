@@ -7,7 +7,7 @@ profile fields directly in its instructions.
 
 from config.supabase import get_supabase_service_client
 
-from agent.tools.context import current_user_id
+from tools.context import current_user_id
 
 _PROFILE_COLUMNS = "display_name, full_name, user_information, system_instructions"
 

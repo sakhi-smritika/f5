@@ -17,7 +17,7 @@ import uuid
 
 from fastapi import APIRouter, Depends
 
-from agent.agent import APP_NAME, get_session_service
+from agent.chat_agent import APP_NAME, get_session_service
 from config.auth import AuthenticatedUser, get_current_user
 from config.supabase import get_supabase_service_client
 
