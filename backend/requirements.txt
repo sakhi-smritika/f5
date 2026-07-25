@@ -4,6 +4,7 @@ python-dotenv==1.2.2
 python-json-logger==4.1.0
 supabase==2.31.0
 google-adk[db]==2.4.0
+mcp==1.28.1
 litellm==1.91.1
 asyncpg==0.31.0
 python-multipart==0.0.32

@@ -49,7 +49,10 @@ INSTRUCTION = (
     "(search_kbits). Write: save a new bit (create_kbit) and record the user's "
     "reaction — read/like/dislike/rating (update_kbit).\n"
     "GOOGLE (only when connected). Calendar: list_calendar_events, "
-    "create_calendar_event. Tasks: list_tasks, create_task, complete_task.\n\n"
+    "create_calendar_event. Tasks: list_tasks, create_task, complete_task.\n"
+    "WEB SEARCH (when the user asks about current events, public facts, or "
+    "anything outside their personal app data). web_search: live web results; "
+    "web_fetch: read a specific URL as markdown.\n\n"
     "Use these tools whenever the user asks about themselves, their days, moods, "
     "events, logs, goals, knowledge bits, schedule, or to-dos instead of guessing. "
     "IMPORTANT: before any tool that writes or changes data (upsert_diary_entry, "
@@ -116,12 +119,8 @@ def _instruction_provider(_ctx) -> str:
 def build_chat_agent(model_id: str | None = None) -> LlmAgent:
     """Create the chat assistant agent.
 
-    Tools are plain Python functions wrapped as ADK ``FunctionTool``s in
-    ``tools.registry``. To connect MCP servers later, add ``McpToolset(...)``
-    entries alongside them:
-
-        from google.adk.tools.mcp_tool import McpToolset, StreamableHTTPConnectionParams
-        tools=[*ALL_TOOLS, McpToolset(connection_params=StreamableHTTPConnectionParams(url=..., headers=...))]
+    Tools come from ``tools.registry`` — native ``FunctionTool``s plus MCP
+    toolsets (e.g. Parallel web search under ``tools/web_search_tools/``).
     """
     resolved_model = model_id or get_default_model_id()
     return LlmAgent(

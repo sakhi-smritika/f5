@@ -1,9 +1,9 @@
 """
 Assembles the ADK tools exposed to the agents.
 
-``ALL_TOOLS`` is the full set the chat assistant gets. ``KBIT_QUERY_TOOLS`` is a
-read-only subset for the knowledge-bit query agent. Both are built from the same
-tool functions, so a fix to a tool applies everywhere it is exposed.
+``ALL_TOOLS`` is the full set the chat assistant gets (``FunctionTool``s and
+``McpToolset``s). ``KBIT_QUERY_TOOLS`` is a read-only ``FunctionTool`` subset
+for the knowledge-bit query agent.
 """
 
 from google.adk.tools import FunctionTool
@@ -43,8 +43,9 @@ from .kbits_tools.kbits_tools import (
     search_kbits,
     update_kbit,
 )
+from .web_search_tools.parallel_web_search import get_parallel_web_search_toolset
 
-ALL_TOOLS: list[FunctionTool] = [
+_FUNCTION_TOOLS: list[FunctionTool] = [
     # Diary
     FunctionTool(get_diary_entry),
     FunctionTool(get_recent_diary_entries),
@@ -72,6 +73,12 @@ ALL_TOOLS: list[FunctionTool] = [
     FunctionTool(create_task),
     FunctionTool(complete_task),
 ]
+
+_MCP_TOOLSETS = [
+    get_parallel_web_search_toolset(),
+]
+
+ALL_TOOLS = [*_FUNCTION_TOOLS, *_MCP_TOOLSETS]
 
 # Read-only tools for the knowledge-bit query agent, which reads the user's
 # current situation to work out what kind of bits they need. Writes are excluded
