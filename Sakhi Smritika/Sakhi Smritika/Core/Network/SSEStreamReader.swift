@@ -4,6 +4,7 @@ import Foundation
 struct SSEStreamReader {
     enum Event {
         case delta(String)
+        case tool(ToolStep)
         case done(title: String?)
         case error(String)
         case unknown([String: Any])
@@ -50,6 +51,9 @@ struct SSEStreamReader {
 
         if let delta = json["delta"] as? String {
             return .delta(delta)
+        }
+        if let tool = json["tool"] as? [String: Any], let step = ToolStep.fromSSE(tool) {
+            return .tool(step)
         }
         if json["done"] as? Bool == true {
             return .done(title: json["title"] as? String)

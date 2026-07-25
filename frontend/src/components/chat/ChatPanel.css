@@ -802,6 +802,109 @@ body.chat-collapsed #root {
   white-space: pre-wrap;
 }
 
+.chat-tool-steps {
+  margin: 0 0 0.65rem;
+  max-width: 36rem;
+}
+
+.chat-tool-steps-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.8rem;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.chat-tool-steps-toggle:hover {
+  border-color: var(--accent-border);
+  color: var(--text-h);
+}
+
+.chat-tool-steps-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: var(--text-h);
+}
+
+.chat-tool-steps-status {
+  text-transform: lowercase;
+  color: var(--text);
+  opacity: 0.75;
+}
+
+.chat-tool-steps-status.running {
+  color: var(--accent);
+  opacity: 1;
+}
+
+.chat-tool-steps-status.error {
+  color: #c2410c;
+  opacity: 1;
+}
+
+.chat-tool-steps-count {
+  margin-left: 0.15rem;
+  opacity: 0.6;
+}
+
+.chat-tool-spin {
+  animation: chat-tool-spin 0.9s linear infinite;
+}
+
+@keyframes chat-tool-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.chat-tool-steps-list {
+  margin: 0.45rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.chat-tool-step {
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  background: var(--bg);
+}
+
+.chat-tool-step-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.chat-tool-step-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8rem;
+  color: var(--text-h);
+}
+
+.chat-tool-step-args {
+  margin: 0;
+  padding: 0.45rem 0.55rem;
+  border-radius: 0.35rem;
+  background: color-mix(in srgb, var(--bg) 70%, var(--border));
+  color: var(--text);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .chat-markdown > :first-child {
   margin-top: 0;
 }

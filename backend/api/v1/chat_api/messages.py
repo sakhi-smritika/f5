@@ -22,6 +22,7 @@ from .access import fetch_pending_attachments, get_owned_conversation, load_atta
 from .attachments import link_attachments_to_turn
 from .conversations import persist_after_turn
 from .schemas import SendMessageBody
+from .tool_events import tool_events_from_adk, tool_steps_from_session_events
 from .utils import build_location_label, build_now_label, sse, stream_error_message
 
 logger = logging.getLogger(__name__)
@@ -46,9 +47,10 @@ async def get_messages(
         )
 
     attachments_by_event = load_attachments_by_event(conversation_id, user.id)
+    tool_steps_by_event = tool_steps_from_session_events(list(session.events))
 
     messages: list[dict] = []
-    for event in session.events:
+    for index, event in enumerate(session.events):
         if not event.content or not event.content.parts:
             continue
         text = "".join(
@@ -58,16 +60,18 @@ async def get_messages(
         )
         role = "assistant" if event.content.role == "model" else "user"
         attachments = attachments_by_event.get(event.id, []) if role == "user" else []
-        if not text and not attachments:
+        tool_steps = tool_steps_by_event[index] if role == "assistant" else []
+        if not text and not attachments and not tool_steps:
             continue
-        messages.append(
-            {
-                "role": role,
-                "text": text,
-                "event_id": event.id,
-                "attachments": attachments,
-            }
-        )
+        message: dict = {
+            "role": role,
+            "text": text,
+            "event_id": event.id,
+            "attachments": attachments,
+        }
+        if tool_steps:
+            message["tool_steps"] = tool_steps
+        messages.append(message)
 
     return {"messages": messages}
 
@@ -134,6 +138,9 @@ async def send_message(
                 new_message=new_message,
                 run_config=RunConfig(streaming_mode=StreamingMode.SSE),
             ):
+                for tool_payload in tool_events_from_adk(event):
+                    yield sse({"tool": tool_payload})
+
                 event_parts = event.content.parts if event.content else None
                 text = "".join(part.text or "" for part in event_parts) if event_parts else ""
                 if not text:

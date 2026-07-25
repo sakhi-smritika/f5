@@ -13,6 +13,7 @@ import {
   moveConversationToFolder,
   renameConversation,
   renameFolder,
+  applyToolStep,
   streamMessage,
   type ChatAttachment,
   type ChatFolder,
@@ -383,6 +384,19 @@ export function ChatPanel() {
                 const copy = prev.slice()
                 const last = copy[copy.length - 1]
                 copy[copy.length - 1] = { ...last, text: last.text + delta }
+                return copy
+              }),
+            onTool: (step) =>
+              setMessages((prev) => {
+                const copy = prev.slice()
+                const last = copy[copy.length - 1]
+                if (last?.role !== 'assistant') {
+                  return prev
+                }
+                copy[copy.length - 1] = {
+                  ...last,
+                  tool_steps: applyToolStep(last.tool_steps, step),
+                }
                 return copy
               }),
             onError: (message) =>

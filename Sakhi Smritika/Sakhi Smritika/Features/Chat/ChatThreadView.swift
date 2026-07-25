@@ -338,7 +338,12 @@ struct MessageBubbleView: View {
                             in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                         )
                 } else {
-                    ChatMarkdownView(text: message.text, isStreaming: isStreaming)
+                    if let toolSteps = message.toolSteps, !toolSteps.isEmpty {
+                        ToolStepsView(steps: toolSteps)
+                    }
+                    if !message.text.isEmpty || isStreaming {
+                        ChatMarkdownView(text: message.text, isStreaming: isStreaming)
+                    }
                 }
             }
 

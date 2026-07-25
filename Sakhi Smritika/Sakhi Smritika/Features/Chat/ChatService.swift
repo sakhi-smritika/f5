@@ -147,6 +147,7 @@ enum ChatService {
         model: String?,
         attachmentIds: [UUID],
         onDelta: @escaping @MainActor (String) -> Void,
+        onTool: (@MainActor (ToolStep) -> Void)? = nil,
         onDone: @escaping @MainActor (String?) -> Void,
         onError: @escaping @MainActor (String) -> Void
     ) async {
@@ -175,6 +176,8 @@ enum ChatService {
                 switch event {
                 case .delta(let text):
                     onDelta(text)
+                case .tool(let step):
+                    onTool?(step)
                 case .done(let title):
                     onDone(title)
                     return

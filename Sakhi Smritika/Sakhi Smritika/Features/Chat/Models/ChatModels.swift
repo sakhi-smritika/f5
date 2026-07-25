@@ -5,6 +5,146 @@ enum ChatRole: String, Codable, Sendable {
     case assistant
 }
 
+enum ToolStepStatus: String, Codable, Sendable {
+    case running
+    case done
+    case error
+}
+
+struct ToolStep: Codable, Identifiable, Hashable, Sendable {
+    let id: String
+    let name: String
+    var status: ToolStepStatus
+    var argsJSON: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case status
+        case args
+    }
+
+    init(id: String, name: String, status: ToolStepStatus, argsJSON: String = "{}") {
+        self.id = id
+        self.name = name
+        self.status = status
+        self.argsJSON = argsJSON
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        status = try container.decode(ToolStepStatus.self, forKey: .status)
+        if let args = try container.decodeIfPresent(JSONDictionary.self, forKey: .args) {
+            argsJSON = Self.formatArgs(args.values)
+        } else {
+            argsJSON = "{}"
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(status, forKey: .status)
+    }
+
+    static func fromSSE(_ json: [String: Any]) -> ToolStep? {
+        guard let id = json["id"] as? String,
+              let name = json["name"] as? String,
+              let statusRaw = json["status"] as? String,
+              let status = ToolStepStatus(rawValue: statusRaw)
+        else { return nil }
+        let args = json["args"] as? [String: Any] ?? [:]
+        return ToolStep(id: id, name: name, status: status, argsJSON: formatArgs(args))
+    }
+
+    private static func formatArgs(_ args: [String: Any]) -> String {
+        guard !args.isEmpty,
+              JSONSerialization.isValidJSONObject(args),
+              let data = try? JSONSerialization.data(
+                withJSONObject: args,
+                options: [.prettyPrinted, .sortedKeys]
+              ),
+              let string = String(data: data, encoding: .utf8)
+        else { return "{}" }
+        return string
+    }
+}
+
+/// Decodes arbitrary JSON objects for tool argument payloads.
+private struct JSONDictionary: Decodable {
+    let values: [String: Any]
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DynamicCodingKey.self)
+        var result: [String: Any] = [:]
+        for key in container.allKeys {
+            if let value = try? container.decode(JSONAnyValue.self, forKey: key) {
+                result[key.stringValue] = value.value
+            }
+        }
+        values = result
+    }
+}
+
+private struct JSONAnyValue: Decodable {
+    let value: Any
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if container.decodeNil() {
+            value = NSNull()
+        } else if let bool = try? container.decode(Bool.self) {
+            value = bool
+        } else if let int = try? container.decode(Int.self) {
+            value = int
+        } else if let double = try? container.decode(Double.self) {
+            value = double
+        } else if let string = try? container.decode(String.self) {
+            value = string
+        } else if let array = try? container.decode([JSONAnyValue].self) {
+            value = array.map(\.value)
+        } else if let object = try? container.decode([String: JSONAnyValue].self) {
+            value = object.mapValues(\.value)
+        } else {
+            value = NSNull()
+        }
+    }
+}
+
+private struct DynamicCodingKey: CodingKey {
+    var stringValue: String
+    var intValue: Int?
+
+    init?(stringValue: String) {
+        self.stringValue = stringValue
+    }
+
+    init?(intValue: Int) {
+        self.intValue = intValue
+        self.stringValue = "\(intValue)"
+    }
+}
+
+enum ChatMessageToolSteps {
+    static func apply(_ step: ToolStep, to steps: [ToolStep]?) -> [ToolStep] {
+        var list = steps ?? []
+        if let index = list.firstIndex(where: { $0.id == step.id }) {
+            var existing = list[index]
+            existing.status = step.status
+            if step.argsJSON != "{}" {
+                existing.argsJSON = step.argsJSON
+            }
+            list[index] = existing
+        } else {
+            list.append(step)
+        }
+        return list
+    }
+}
+
 struct ChatAttachment: Codable, Identifiable, Hashable, Sendable {
     let id: UUID
     let filename: String
@@ -27,12 +167,14 @@ struct ChatMessage: Codable, Identifiable, Hashable, Sendable {
     var text: String
     var eventId: String?
     var attachments: [ChatAttachment]?
+    var toolSteps: [ToolStep]?
 
     enum CodingKeys: String, CodingKey {
         case role
         case text
         case eventId = "event_id"
         case attachments
+        case toolSteps = "tool_steps"
     }
 }
 

@@ -142,11 +142,19 @@ struct KbitDiscussionSheet: View {
             api: apiClient,
             conversationId: conversationId,
             text: text,
-            model: nil,
+            model: nil as String?,
             attachmentIds: [],
             onDelta: { delta in
                 if let last = messages.indices.last {
                     messages[last].text += delta
+                }
+            },
+            onTool: { step in
+                if let last = messages.indices.last, messages[last].role == .assistant {
+                    messages[last].toolSteps = ChatMessageToolSteps.apply(
+                        step,
+                        to: messages[last].toolSteps
+                    )
                 }
             },
             onDone: { _ in

@@ -154,6 +154,14 @@ final class ChatThreadViewModel {
                     guard let self, let last = self.messages.indices.last else { return }
                     self.messages[last].text += delta
                 },
+                onTool: { [weak self] step in
+                    guard let self, let last = self.messages.indices.last else { return }
+                    guard self.messages[last].role == .assistant else { return }
+                    self.messages[last].toolSteps = ChatMessageToolSteps.apply(
+                        step,
+                        to: self.messages[last].toolSteps
+                    )
+                },
                 onDone: { [weak self] newTitle in
                     guard let self else { return }
                     self.isStreaming = false

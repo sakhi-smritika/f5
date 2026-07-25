@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Check, Copy, FileText, Quote } from 'lucide-react'
 import type { ChatAttachment, ChatMessage } from '../../lib/chat'
+import { ToolSteps } from './ToolSteps'
 
 type PinnedKbit = {
   title: string
@@ -261,21 +262,28 @@ export function MessageList({
                 }
               >
                 {message.role === 'assistant' ? (
-                  <div className="chat-markdown">
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={{
-                        a: ({ node, ...props }) => (
-                          <a {...props} target="_blank" rel="noreferrer noopener" />
-                        ),
-                      }}
-                    >
-                      {message.text}
-                    </ReactMarkdown>
-                    {streaming && isLast ? (
-                      <span className="chat-cursor" />
+                  <>
+                    {message.tool_steps && message.tool_steps.length > 0 ? (
+                      <ToolSteps steps={message.tool_steps} />
                     ) : null}
-                  </div>
+                    {message.text || (streaming && isLast) ? (
+                      <div className="chat-markdown">
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            a: ({ node, ...props }) => (
+                              <a {...props} target="_blank" rel="noreferrer noopener" />
+                            ),
+                          }}
+                        >
+                          {message.text}
+                        </ReactMarkdown>
+                        {streaming && isLast ? (
+                          <span className="chat-cursor" />
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </>
                 ) : (
                   <>
                     {message.attachments && message.attachments.length > 0 ? (

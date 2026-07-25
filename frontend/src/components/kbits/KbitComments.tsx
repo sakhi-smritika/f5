@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { SendHorizontal } from 'lucide-react'
-import { loadMessages, streamMessage, type ChatMessage } from '../../lib/chat'
+import {
+  applyToolStep,
+  loadMessages,
+  streamMessage,
+  type ChatMessage,
+} from '../../lib/chat'
 import { ensureKbitDiscussion } from '../../lib/kbits'
 import { MessageList } from '../chat/MessageList'
 import './KbitComments.css'
@@ -88,6 +93,19 @@ export function KbitComments({ kbitId, onStarted }: KbitCommentsProps) {
             const copy = prev.slice()
             const last = copy[copy.length - 1]
             copy[copy.length - 1] = { ...last, text: last.text + delta }
+            return copy
+          }),
+        onTool: (step) =>
+          setMessages((prev) => {
+            const copy = prev.slice()
+            const last = copy[copy.length - 1]
+            if (last?.role !== 'assistant') {
+              return prev
+            }
+            copy[copy.length - 1] = {
+              ...last,
+              tool_steps: applyToolStep(last.tool_steps, step),
+            }
             return copy
           }),
         onError: (message) => setError(message || 'Smritika failed to respond.'),

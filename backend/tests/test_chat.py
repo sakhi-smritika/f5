@@ -28,16 +28,43 @@ class FakeSessionService:
 
 
 class FakeEvent:
-    def __init__(self, text, *, partial, final, role="model", event_id=None):
+    def __init__(
+        self,
+        text="",
+        *,
+        partial,
+        final,
+        role="model",
+        event_id=None,
+        function_calls=None,
+        function_responses=None,
+    ):
         self.id = event_id or "evt-1"
-        self.content = SimpleNamespace(
-            role=role, parts=[SimpleNamespace(text=text)]
-        )
+        parts = []
+        if text:
+            parts.append(SimpleNamespace(text=text, function_call=None, function_response=None))
+        for call in function_calls or []:
+            parts.append(
+                SimpleNamespace(text=None, function_call=call, function_response=None)
+            )
+        for response in function_responses or []:
+            parts.append(
+                SimpleNamespace(text=None, function_call=None, function_response=response)
+            )
+        self.content = SimpleNamespace(role=role, parts=parts)
         self.partial = partial
         self._final = final
+        self._function_calls = function_calls or []
+        self._function_responses = function_responses or []
 
     def is_final_response(self):
         return self._final
+
+    def get_function_calls(self):
+        return self._function_calls
+
+    def get_function_responses(self):
+        return self._function_responses
 
 
 class FakeRunner:
@@ -256,6 +283,103 @@ def test_send_message_streams_sse_and_sets_title(client, patch_chat):
     assert '"done": true' in body
     # First turn derived a title from the user's message.
     assert supabase.table_obj.updated[0]["title"] == "what is up"
+
+
+def test_send_message_streams_tool_events(client, patch_chat):
+    call = SimpleNamespace(id="fc-1", name="web_search", args={"query": "meditation"})
+    response_part = SimpleNamespace(id="fc-1", name="web_search", response={"ok": True})
+    runner = FakeRunner(
+        [
+            FakeEvent(
+                "",
+                partial=False,
+                final=False,
+                function_calls=[call],
+                event_id="call-evt",
+            ),
+            FakeEvent(
+                "",
+                partial=False,
+                final=False,
+                role="user",
+                function_responses=[response_part],
+                event_id="resp-evt",
+            ),
+            FakeEvent("Here is what I found.", partial=False, final=True),
+        ]
+    )
+    patch_chat(
+        session_service=FakeSessionService(session=SimpleNamespace(events=[])),
+        runner=runner,
+        supabase=FakeSupabase(select_data=OWNED_ROW),
+    )
+
+    response = client.post(
+        "/api/v1/chat/conversations/conv-1/messages",
+        json={"text": "search meditation"},
+    )
+
+    assert response.status_code == 200
+    body = response.text
+    assert '"tool":' in body
+    assert '"name": "web_search"' in body
+    assert '"status": "running"' in body
+    assert '"status": "done"' in body
+    assert '"query": "meditation"' in body
+    assert '"delta": "Here is what I found."' in body
+
+
+def test_get_messages_includes_tool_steps(client, patch_chat):
+    call = SimpleNamespace(id="fc-1", name="list_my_goals", args={})
+    response_part = SimpleNamespace(id="fc-1", name="list_my_goals", response={"goals": []})
+    session = SimpleNamespace(
+        events=[
+            FakeEvent(
+                "show my goals", partial=False, final=True, role="user", event_id="u-1"
+            ),
+            FakeEvent(
+                "",
+                partial=False,
+                final=False,
+                function_calls=[call],
+                event_id="m-call",
+            ),
+            FakeEvent(
+                "",
+                partial=False,
+                final=False,
+                role="user",
+                function_responses=[response_part],
+                event_id="m-resp",
+            ),
+            FakeEvent(
+                "You have no goals yet.",
+                partial=False,
+                final=True,
+                event_id="m-1",
+            ),
+        ]
+    )
+    patch_chat(
+        session_service=FakeSessionService(session=session),
+        supabase=FakeSupabase(select_data=OWNED_ROW),
+    )
+
+    response = client.get("/api/v1/chat/conversations/conv-1/messages")
+
+    assert response.status_code == 200
+    messages = response.json()["messages"]
+    assert messages[0]["role"] == "user"
+    assert messages[1]["role"] == "assistant"
+    assert messages[1]["text"] == "You have no goals yet."
+    assert messages[1]["tool_steps"] == [
+        {
+            "id": "fc-1",
+            "name": "list_my_goals",
+            "status": "done",
+            "args": {},
+        }
+    ]
 
 
 def test_send_message_rejects_unknown_model(client, patch_chat, monkeypatch):

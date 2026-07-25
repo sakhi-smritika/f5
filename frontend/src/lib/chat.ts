@@ -3,6 +3,15 @@ import { supabase } from './supabase'
 
 export type ChatRole = 'user' | 'assistant'
 
+export type ToolStepStatus = 'running' | 'done' | 'error'
+
+export type ToolStep = {
+  id: string
+  name: string
+  status: ToolStepStatus
+  args?: Record<string, unknown>
+}
+
 export type ChatAttachment = {
   id: string
   filename: string
@@ -16,6 +25,23 @@ export type ChatMessage = {
   text: string
   event_id?: string
   attachments?: ChatAttachment[]
+  tool_steps?: ToolStep[]
+}
+
+/** Upsert a tool step into an assistant message's step list by id. */
+export function applyToolStep(steps: ToolStep[] | undefined, step: ToolStep): ToolStep[] {
+  const list = steps ? steps.slice() : []
+  const index = list.findIndex((item) => item.id === step.id)
+  if (index === -1) {
+    list.push(step)
+    return list
+  }
+  list[index] = {
+    ...list[index],
+    ...step,
+    args: step.args ?? list[index].args,
+  }
+  return list
 }
 
 export async function uploadAttachment(
@@ -216,6 +242,7 @@ export async function deleteConversation(conversationId: string): Promise<void> 
 
 export type StreamHandlers = {
   onDelta: (text: string) => void
+  onTool?: (step: ToolStep) => void
   onDone: (info: { title?: string }) => void
   onError: (message: string) => void
 }
@@ -359,7 +386,13 @@ export async function streamMessage(
         continue
       }
 
-      let payload: { delta?: string; done?: boolean; title?: string; error?: string }
+      let payload: {
+        delta?: string
+        done?: boolean
+        title?: string
+        error?: string
+        tool?: ToolStep
+      }
       try {
         payload = JSON.parse(json)
       } catch {
@@ -368,6 +401,8 @@ export async function streamMessage(
 
       if (payload.error) {
         handlers.onError(payload.error)
+      } else if (payload.tool && handlers.onTool) {
+        handlers.onTool(payload.tool)
       } else if (payload.delta) {
         handlers.onDelta(payload.delta)
       } else if (payload.done) {
