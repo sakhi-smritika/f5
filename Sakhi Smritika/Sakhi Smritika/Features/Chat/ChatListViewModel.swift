@@ -17,7 +17,6 @@ final class ChatListViewModel {
     var folders: [ChatFolder] = []
     var conversations: [Conversation] = []
     var expandedFolderIds: Set<UUID> = []
-    var isLoading = true
     var loadError: String?
     var models: [ChatModel] = []
     var selectedModelId: String = ""
@@ -27,12 +26,31 @@ final class ChatListViewModel {
     var folderToDelete: ChatFolder?
     var conversationToDelete: Conversation?
 
+    private(set) var isRefreshing = false
+    private(set) var hasData = false
+
+    /// Only block the list with a spinner when there is nothing cached to show.
+    var isLoading: Bool { isRefreshing && !hasData }
+
     private let authService: AuthService
     private let apiClient: APIClient
+    private let cache: CacheStore
+    private let refreshTracker: SessionRefreshTracker
+    private let threadRegistry: ChatThreadRegistry
 
-    init(authService: AuthService, apiClient: APIClient) {
+    init(
+        authService: AuthService,
+        apiClient: APIClient,
+        cache: CacheStore,
+        refreshTracker: SessionRefreshTracker,
+        threadRegistry: ChatThreadRegistry
+    ) {
         self.authService = authService
         self.apiClient = apiClient
+        self.cache = cache
+        self.refreshTracker = refreshTracker
+        self.threadRegistry = threadRegistry
+        readFromCache()
     }
 
     var unfolderedConversations: [Conversation] {
@@ -47,36 +65,114 @@ final class ChatListViewModel {
             .sorted { ($0.updatedAt ?? "") > ($1.updatedAt ?? "") }
     }
 
-    func load() async {
-        isLoading = true
+    /// Runs on every appearance of the Chat tab. Re-reading the local store is
+    /// free and picks up conversations created elsewhere in the app (a knowledge
+    /// bit discussion, for instance); the network is only touched once per launch.
+    func appear() async {
+        readFromCache()
+        if refreshTracker.claim(RefreshKey.conversations) {
+            await refreshList()
+        }
+        if refreshTracker.claim(RefreshKey.chatModels) {
+            await refreshModels()
+        }
+    }
+
+    /// Pull to refresh always goes to the network.
+    func reload() async {
+        _ = refreshTracker.claim(RefreshKey.conversations)
+        _ = refreshTracker.claim(RefreshKey.chatModels)
+        await refreshList()
+        await refreshModels()
+    }
+
+    /// Hands back the live view model for a thread, so a draft, an upload in
+    /// progress, or a running stream survives navigating away and back.
+    func threadViewModel(for route: ChatThreadRegistry.Key) -> ChatThreadViewModel {
+        let viewModel = threadRegistry.viewModel(for: route) { [self] in
+            let conversation: Conversation?
+            switch route {
+            case .conversation(let id):
+                conversation = conversations.first(where: { $0.id == id })
+            case .draft, .kbit:
+                conversation = nil
+            }
+            return ChatThreadViewModel(
+                conversation: conversation,
+                models: models,
+                selectedModelId: selectedModelId,
+                apiClient: apiClient,
+                cache: cache,
+                refreshTracker: refreshTracker
+            )
+        }
+        // Rebound every time because a thread first opened from the Kbits tab can
+        // later be presented by this list.
+        viewModel.onConversationUpdated = { [weak self] updated in
+            self?.upsertConversation(updated)
+        }
+        return viewModel
+    }
+
+    private func readFromCache() {
+        folders = cache.folders()
+        conversations = cache.conversations()
+        hasData = cache.hasSynced(RefreshKey.conversations)
+
+        if let cached = cache.chatModels() {
+            models = cached.models
+            selectedModelId = resolvedModelId(for: cached)
+        }
+    }
+
+    private func refreshList() async {
+        isRefreshing = true
         loadError = nil
-        defer { isLoading = false }
+        defer { isRefreshing = false }
 
         do {
             async let foldersTask = ChatService.listFolders()
             async let conversationsTask = ChatService.listConversations()
 
-            folders = try await foldersTask
-            conversations = try await conversationsTask
+            let loadedFolders = try await foldersTask
+            let loadedConversations = try await conversationsTask
+
+            folders = loadedFolders
+            conversations = loadedConversations
+            hasData = true
+
+            cache.replaceFolders(loadedFolders)
+            cache.replaceConversations(loadedConversations)
+            cache.markSynced(RefreshKey.conversations)
         } catch {
             loadError = error.localizedDescription
-            return
+            refreshTracker.release(RefreshKey.conversations)
         }
+    }
 
+    private func refreshModels() async {
         do {
-            let modelsResponse = try await ChatService.listModels(api: apiClient)
-            models = modelsResponse.models
-            if let stored = ChatModelStorage.stored,
-               models.contains(where: { $0.id == stored }) {
-                selectedModelId = stored
-            } else {
-                selectedModelId = modelsResponse.defaultModel
-            }
+            let response = try await ChatService.listModels(api: apiClient)
+            models = response.models
+            selectedModelId = resolvedModelId(for: response)
+            cache.setChatModels(response)
         } catch {
-            models = []
-            selectedModelId = ""
-            loadError = "Models unavailable: \(error.localizedDescription)"
+            refreshTracker.release(RefreshKey.chatModels)
+            // Keep whatever the cache already gave us; only surface the failure
+            // when there is nothing to pick from.
+            if models.isEmpty {
+                selectedModelId = ""
+                loadError = "Models unavailable: \(error.localizedDescription)"
+            }
         }
+    }
+
+    private func resolvedModelId(for response: ChatModelsResponse) -> String {
+        if let stored = ChatModelStorage.stored,
+           response.models.contains(where: { $0.id == stored }) {
+            return stored
+        }
+        return response.defaultModel
     }
 
     func selectModel(_ id: String) {
@@ -100,6 +196,7 @@ final class ChatListViewModel {
             let folder = try await ChatService.createFolder(name: name, userId: userId)
             folders.append(folder)
             folders.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            cache.upsertFolder(folder)
             newFolderName = ""
             showNewFolderAlert = false
             expandedFolderIds.insert(folder.id)
@@ -116,6 +213,7 @@ final class ChatListViewModel {
             if let index = folders.firstIndex(where: { $0.id == folder.id }) {
                 folders[index] = updated
             }
+            cache.upsertFolder(updated)
         } catch {
             loadError = error.localizedDescription
         }
@@ -124,9 +222,17 @@ final class ChatListViewModel {
     func deleteFolder(_ folder: ChatFolder) async {
         do {
             try await ChatService.deleteFolder(api: apiClient, id: folder.id)
+            let removedIds = conversations.filter { $0.folderId == folder.id }.map(\.id)
             folders.removeAll { $0.id == folder.id }
             conversations.removeAll { $0.folderId == folder.id }
             expandedFolderIds.remove(folder.id)
+
+            cache.deleteConversations(folderId: folder.id)
+            cache.deleteFolder(id: folder.id)
+            for id in removedIds {
+                cache.deleteKbitDiscussion(conversationId: id)
+                threadRegistry.remove(conversationId: id)
+            }
         } catch {
             loadError = error.localizedDescription
         }
@@ -140,6 +246,7 @@ final class ChatListViewModel {
             if let index = conversations.firstIndex(where: { $0.id == conversation.id }) {
                 conversations[index].title = trimmed
             }
+            cache.setConversationTitle(id: conversation.id, title: trimmed)
         } catch {
             loadError = error.localizedDescription
         }
@@ -151,6 +258,7 @@ final class ChatListViewModel {
             if let index = conversations.firstIndex(where: { $0.id == conversation.id }) {
                 conversations[index].folderId = folderId
             }
+            cache.setConversationFolder(id: conversation.id, folderId: folderId)
         } catch {
             loadError = error.localizedDescription
         }
@@ -160,6 +268,9 @@ final class ChatListViewModel {
         do {
             try await ChatService.deleteConversation(api: apiClient, id: conversation.id)
             conversations.removeAll { $0.id == conversation.id }
+            cache.deleteConversation(id: conversation.id)
+            cache.deleteKbitDiscussion(conversationId: conversation.id)
+            threadRegistry.remove(conversationId: conversation.id)
         } catch {
             loadError = error.localizedDescription
         }
@@ -185,5 +296,6 @@ final class ChatListViewModel {
             conversations.insert(conversation, at: 0)
         }
         conversations.sort { ($0.updatedAt ?? "") > ($1.updatedAt ?? "") }
+        cache.mergeConversation(conversation)
     }
 }

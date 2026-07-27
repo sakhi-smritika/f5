@@ -13,7 +13,6 @@ final class ChatThreadViewModel {
     var messages: [ChatMessage] = []
     var draft = ""
     var pendingAttachments: [PendingAttachment] = []
-    var isLoading = false
     var isStreaming = false
     var loadError: String?
     var sendError: String?
@@ -22,23 +21,58 @@ final class ChatThreadViewModel {
     var models: [ChatModel]
     var selectedModelId: String
 
+    private(set) var isRefreshing = false
+    private(set) var hasMessages = false
+
+    /// Only block the thread with a spinner when there is nothing cached to show.
+    var isLoading: Bool { isRefreshing && !hasMessages }
+
+    /// Rebound by whichever screen is presenting this thread, so the chat list
+    /// can update live. Not observed — it is set during view construction.
+    @ObservationIgnored
+    var onConversationUpdated: (@MainActor (Conversation) -> Void)?
+
     private let apiClient: APIClient
-    private let onConversationUpdated: (Conversation) -> Void
+    private let cache: CacheStore
+    private let refreshTracker: SessionRefreshTracker
+    /// Set for a knowledge bit discussion, whose conversation is resolved by the
+    /// backend rather than passed in.
+    private let bootstrapKbit: KnowledgeBit?
 
     init(
         conversation: Conversation?,
         models: [ChatModel],
         selectedModelId: String,
         apiClient: APIClient,
-        onConversationUpdated: @escaping (Conversation) -> Void
+        cache: CacheStore,
+        refreshTracker: SessionRefreshTracker,
+        bootstrapKbit: KnowledgeBit? = nil
     ) {
-        self.conversationId = conversation?.id
-        self.kbitId = conversation?.kbitId
-        self.title = conversation?.displayTitle ?? "New chat"
+        self.apiClient = apiClient
+        self.cache = cache
+        self.refreshTracker = refreshTracker
+        self.bootstrapKbit = bootstrapKbit
         self.models = models
         self.selectedModelId = selectedModelId
-        self.apiClient = apiClient
-        self.onConversationUpdated = onConversationUpdated
+
+        self.conversationId = conversation?.id
+            ?? bootstrapKbit.flatMap { cache.kbitDiscussionConversationId(kbitId: $0.id) }
+        self.kbitId = conversation?.kbitId ?? bootstrapKbit?.id
+        self.title = bootstrapKbit?.title ?? conversation?.displayTitle ?? "New chat"
+
+        if let bootstrapKbit {
+            pinnedKbit = bootstrapKbit
+        } else if let kbitId, let cached = cache.kbit(id: kbitId) {
+            pinnedKbit = cached
+            if title == "New chat" || title.isEmpty {
+                title = cached.title
+            }
+        }
+
+        if let conversationId, let cached = cache.messages(conversationId: conversationId) {
+            messages = cached
+            hasMessages = true
+        }
     }
 
     var canSend: Bool {
@@ -58,50 +92,133 @@ final class ChatThreadViewModel {
             ?? "Model"
     }
 
-    func loadIfNeeded() async {
-        guard let conversationId else { return }
-        isLoading = true
-        loadError = nil
-        defer { isLoading = false }
+    /// Picks up the model list once the chat list has it, for threads that were
+    /// created before it finished loading.
+    func syncModels(_ models: [ChatModel], selectedModelId: String) {
+        guard !models.isEmpty else { return }
+        self.models = models
+        if !models.contains(where: { $0.id == self.selectedModelId }) {
+            self.selectedModelId = selectedModelId
+        }
+    }
 
-        async let pinnedTask: () = loadPinnedKbitIfNeeded()
-        do {
-            messages = try await ChatService.loadMessages(api: apiClient, conversationId: conversationId)
-        } catch {
-            loadError = error.localizedDescription
+    /// Runs on every appearance. Cached messages are already on screen from
+    /// `init`; the network is only touched once per launch per conversation.
+    func appear() async {
+        await resolveDiscussionIfNeeded()
+        guard let conversationId else { return }
+
+        if !hasMessages, let cached = cache.messages(conversationId: conversationId) {
+            messages = cached
+            hasMessages = true
+        }
+
+        async let pinnedTask: () = refreshPinnedKbitIfNeeded()
+        if refreshTracker.claim(RefreshKey.messages(conversationId)) {
+            await refreshMessages(conversationId: conversationId)
         }
         await pinnedTask
     }
 
-    private func loadPinnedKbitIfNeeded() async {
+    /// Pull to refresh always goes to the network.
+    func reload() async {
+        await resolveDiscussionIfNeeded()
+        guard let conversationId else { return }
+        _ = refreshTracker.claim(RefreshKey.messages(conversationId))
+        await refreshMessages(conversationId: conversationId)
+    }
+
+    private func refreshMessages(conversationId: UUID) async {
+        guard !isStreaming else { return }
+        isRefreshing = true
+        loadError = nil
+        defer { isRefreshing = false }
+
+        do {
+            let loaded = try await ChatService.loadMessages(
+                api: apiClient,
+                conversationId: conversationId
+            )
+            // A send that started while this was in flight owns the transcript.
+            guard !isStreaming else { return }
+            messages = loaded
+            hasMessages = true
+            cache.replaceMessages(loaded, conversationId: conversationId)
+        } catch {
+            refreshTracker.release(RefreshKey.messages(conversationId))
+            if !hasMessages {
+                loadError = error.localizedDescription
+            }
+        }
+    }
+
+    /// Resolves a knowledge bit discussion's conversation the first time it is
+    /// opened. Later launches read the mapping straight from the cache.
+    private func resolveDiscussionIfNeeded() async {
+        guard conversationId == nil, let bootstrapKbit else { return }
+        do {
+            let id = try await KbitService.ensureDiscussion(api: apiClient, kbitId: bootstrapKbit.id)
+            conversationId = id
+            cache.setKbitDiscussion(kbitId: bootstrapKbit.id, conversationId: id)
+            if let cached = cache.messages(conversationId: id) {
+                messages = cached
+                hasMessages = true
+            }
+        } catch {
+            loadError = error.localizedDescription
+        }
+    }
+
+    private func refreshPinnedKbitIfNeeded() async {
         guard let kbitId else {
             pinnedKbit = nil
             return
         }
+        if pinnedKbit == nil, let cached = cache.kbit(id: kbitId) {
+            pinnedKbit = cached
+            applyKbitTitleIfUnnamed(cached)
+        }
+        guard refreshTracker.claim(RefreshKey.pinnedKbit(kbitId)) else { return }
         do {
-            pinnedKbit = try await KbitService.getKbit(id: kbitId)
-            if let pinnedKbit, title == "New chat" || title.isEmpty {
-                title = pinnedKbit.title
-            }
+            guard let bit = try await KbitService.getKbit(id: kbitId) else { return }
+            pinnedKbit = bit
+            cache.setKbit(bit)
+            applyKbitTitleIfUnnamed(bit)
         } catch {
-            pinnedKbit = nil
+            refreshTracker.release(RefreshKey.pinnedKbit(kbitId))
+        }
+    }
+
+    private func applyKbitTitleIfUnnamed(_ bit: KnowledgeBit) {
+        if title == "New chat" || title.isEmpty {
+            title = bit.title
         }
     }
 
     func ensureConversation() async throws -> UUID {
         if let conversationId { return conversationId }
+
+        if let bootstrapKbit {
+            let id = try await KbitService.ensureDiscussion(api: apiClient, kbitId: bootstrapKbit.id)
+            conversationId = id
+            cache.setKbitDiscussion(kbitId: bootstrapKbit.id, conversationId: id)
+            return id
+        }
+
         let created = try await ChatService.createConversation(api: apiClient)
         conversationId = created.id
         title = created.title?.nilIfEmpty ?? "New chat"
+        let now = ISO8601DateFormatter().string(from: Date())
         let conversation = Conversation(
             id: created.id,
             title: created.title,
             folderId: created.folderId,
-            createdAt: ISO8601DateFormatter().string(from: Date()),
-            updatedAt: ISO8601DateFormatter().string(from: Date()),
+            createdAt: now,
+            updatedAt: now,
             kbitId: nil
         )
-        onConversationUpdated(conversation)
+        cache.upsertConversation(conversation)
+        onConversationUpdated?(conversation)
         return created.id
     }
 
@@ -140,6 +257,7 @@ final class ChatThreadViewModel {
         )
         messages.append(ChatMessage(role: .assistant, text: ""))
         isStreaming = true
+        hasMessages = true
 
         do {
             let id = try await ensureConversation()
@@ -176,7 +294,12 @@ final class ChatThreadViewModel {
                         updatedAt: ISO8601DateFormatter().string(from: Date()),
                         kbitId: self.kbitId
                     )
-                    self.onConversationUpdated(updated)
+                    self.cache.replaceMessages(self.messages, conversationId: id)
+                    self.cache.mergeConversation(updated)
+                    // The local transcript is now complete, so reopening this
+                    // thread should not refetch it during this launch.
+                    _ = self.refreshTracker.claim(RefreshKey.messages(id))
+                    self.onConversationUpdated?(updated)
                 },
                 onError: { [weak self] message in
                     guard let self else { return }
@@ -187,6 +310,7 @@ final class ChatThreadViewModel {
                        self.messages[last].text.isEmpty {
                         self.messages.removeLast()
                     }
+                    self.cache.replaceMessages(self.messages, conversationId: id)
                 }
             )
         } catch {

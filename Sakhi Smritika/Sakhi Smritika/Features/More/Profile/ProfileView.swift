@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ProfileView: View {
     @Environment(AuthService.self) private var authService
+    @Environment(AppDependencies.self) private var dependencies
     @State private var viewModel: ProfileViewModel?
 
     var body: some View {
@@ -16,9 +17,13 @@ struct ProfileView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             if viewModel == nil {
-                viewModel = ProfileViewModel(authService: authService)
+                viewModel = ProfileViewModel(
+                    authService: authService,
+                    cache: dependencies.cache,
+                    refreshTracker: dependencies.refreshTracker
+                )
             }
-            await viewModel?.load()
+            await viewModel?.appear()
         }
     }
 

@@ -3,70 +3,56 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ChatThreadView: View {
-    let conversation: Conversation?
+    /// Owned by `ChatThreadRegistry`, not by this view, so a draft in the
+    /// composer and any running stream survive navigating away and back.
+    let viewModel: ChatThreadViewModel
     let listViewModel: ChatListViewModel
 
-    @Environment(AppDependencies.self) private var dependencies
-    @State private var viewModel: ChatThreadViewModel?
     @State private var photoItems: [PhotosPickerItem] = []
     @State private var showFileImporter = false
     @FocusState private var composerFocused: Bool
 
     var body: some View {
-        Group {
-            if let viewModel {
-                threadContent(viewModel)
-            } else {
-                LoadingView()
-            }
-        }
-        .navigationTitle(viewModel?.title ?? conversation?.displayTitle ?? "New chat")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            if let viewModel, viewModel.models.count > 1 {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Picker("Model", selection: Binding(
-                            get: { viewModel.selectedModelId },
-                            set: { id in
-                                viewModel.selectedModelId = id
-                                listViewModel.selectModel(id)
+        threadContent(viewModel)
+            .navigationTitle(viewModel.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                if viewModel.models.count > 1 {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Menu {
+                            Picker("Model", selection: Binding(
+                                get: { viewModel.selectedModelId },
+                                set: { id in
+                                    viewModel.selectedModelId = id
+                                    listViewModel.selectModel(id)
+                                }
+                            )) {
+                                ForEach(viewModel.models) { model in
+                                    Text(model.label).tag(model.id)
+                                }
                             }
-                        )) {
-                            ForEach(viewModel.models) { model in
-                                Text(model.label).tag(model.id)
-                            }
+                        } label: {
+                            Image(systemName: "cpu")
                         }
-                    } label: {
-                        Image(systemName: "cpu")
+                        .accessibilityLabel("Model: \(viewModel.selectedModelLabel)")
                     }
-                    .accessibilityLabel("Model: \(viewModel.selectedModelLabel)")
                 }
             }
-        }
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Done") {
-                    composerFocused = false
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        composerFocused = false
+                    }
                 }
             }
-        }
-        .task {
-            if viewModel == nil {
-                viewModel = ChatThreadViewModel(
-                    conversation: conversation,
-                    models: listViewModel.models,
-                    selectedModelId: listViewModel.selectedModelId,
-                    apiClient: dependencies.apiClient,
-                    onConversationUpdated: { updated in
-                        listViewModel.upsertConversation(updated)
-                        listViewModel.selectModel(listViewModel.selectedModelId)
-                    }
+            .task {
+                viewModel.syncModels(
+                    listViewModel.models,
+                    selectedModelId: listViewModel.selectedModelId
                 )
+                await viewModel.appear()
             }
-            await viewModel?.loadIfNeeded()
-        }
     }
 
     @ViewBuilder
@@ -168,6 +154,7 @@ struct ChatThreadView: View {
                 .padding(16)
             }
             .scrollDismissesKeyboard(.interactively)
+            .refreshable { await vm.reload() }
             .onTapGesture {
                 composerFocused = false
             }

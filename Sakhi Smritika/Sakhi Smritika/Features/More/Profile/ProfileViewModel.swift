@@ -8,38 +8,76 @@ final class ProfileViewModel {
     var fullName = ""
     var userInformation = ""
     var systemInstructions = ""
-    var isLoading = true
     var loadError: String?
     var saveStatus: SaveStatus = .idle
 
-    private let authService: AuthService
+    private(set) var isRefreshing = false
+    private(set) var hasData = false
 
-    init(authService: AuthService) {
+    /// Only block the form with a spinner when there is nothing cached to show.
+    var isLoading: Bool { isRefreshing && !hasData }
+
+    /// Guards the editable fields: a background refresh must never overwrite text
+    /// the user is in the middle of typing.
+    private var hasUnsavedEdits = false
+
+    private let authService: AuthService
+    private let cache: CacheStore
+    private let refreshTracker: SessionRefreshTracker
+
+    init(authService: AuthService, cache: CacheStore, refreshTracker: SessionRefreshTracker) {
         self.authService = authService
+        self.cache = cache
+        self.refreshTracker = refreshTracker
+        readFromCache()
     }
 
-    func load() async {
+    func appear() async {
+        guard !hasUnsavedEdits else { return }
+        readFromCache()
+        guard refreshTracker.claim(RefreshKey.profile) else { return }
+        await refresh()
+    }
+
+    private func readFromCache() {
+        guard let userId = authService.user?.id,
+              let cached = cache.profile(userId: userId) else { return }
+        apply(cached.value)
+        hasData = true
+    }
+
+    private func apply(_ profile: Profile?) {
+        fullName = profile?.fullName ?? ""
+        userInformation = profile?.userInformation ?? ""
+        systemInstructions = profile?.systemInstructions ?? ""
+    }
+
+    private func refresh() async {
         guard let userId = authService.user?.id else {
-            isLoading = false
             loadError = "You must be signed in."
             return
         }
 
-        isLoading = true
+        isRefreshing = true
         loadError = nil
-        defer { isLoading = false }
+        defer { isRefreshing = false }
 
         do {
             let profile = try await ProfileService.profile(userId: userId)
-            fullName = profile?.fullName ?? ""
-            userInformation = profile?.userInformation ?? ""
-            systemInstructions = profile?.systemInstructions ?? ""
+            cache.setProfile(profile, userId: userId)
+            guard !hasUnsavedEdits else { return }
+            apply(profile)
+            hasData = true
         } catch {
-            loadError = error.localizedDescription
+            refreshTracker.release(RefreshKey.profile)
+            if !hasData {
+                loadError = error.localizedDescription
+            }
         }
     }
 
     func markEdited() {
+        hasUnsavedEdits = true
         if saveStatus != .idle { saveStatus = .idle }
     }
 
@@ -57,9 +95,10 @@ final class ProfileViewModel {
                 userInformation: userInformation,
                 systemInstructions: systemInstructions
             )
-            fullName = saved.fullName ?? ""
-            userInformation = saved.userInformation ?? ""
-            systemInstructions = saved.systemInstructions ?? ""
+            apply(saved)
+            cache.setProfile(saved, userId: userId)
+            hasData = true
+            hasUnsavedEdits = false
             saveStatus = .saved
         } catch {
             saveStatus = .error(error.localizedDescription)

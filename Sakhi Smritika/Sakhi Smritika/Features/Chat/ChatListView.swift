@@ -12,6 +12,13 @@ struct ChatListView: View {
     private enum Route: Hashable {
         case draft(UUID)
         case conversation(UUID)
+
+        var threadKey: ChatThreadRegistry.Key {
+            switch self {
+            case .draft(let token): return .draft(token)
+            case .conversation(let id): return .conversation(id)
+            }
+        }
     }
 
     var body: some View {
@@ -37,28 +44,23 @@ struct ChatListView: View {
             }
             .navigationDestination(for: Route.self) { route in
                 if let viewModel {
-                    switch route {
-                    case .draft:
-                        ChatThreadView(
-                            conversation: nil,
-                            listViewModel: viewModel
-                        )
-                    case .conversation(let id):
-                        ChatThreadView(
-                            conversation: viewModel.conversations.first(where: { $0.id == id }),
-                            listViewModel: viewModel
-                        )
-                    }
+                    ChatThreadView(
+                        viewModel: viewModel.threadViewModel(for: route.threadKey),
+                        listViewModel: viewModel
+                    )
                 }
             }
             .task {
                 if viewModel == nil {
                     viewModel = ChatListViewModel(
                         authService: authService,
-                        apiClient: dependencies.apiClient
+                        apiClient: dependencies.apiClient,
+                        cache: dependencies.cache,
+                        refreshTracker: dependencies.refreshTracker,
+                        threadRegistry: dependencies.threadRegistry
                     )
                 }
-                await viewModel?.load()
+                await viewModel?.appear()
             }
         }
     }
@@ -139,7 +141,7 @@ struct ChatListView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .refreshable { await vm.load() }
+        .refreshable { await vm.reload() }
         .alert("New folder", isPresented: $vm.showNewFolderAlert) {
             TextField("Name", text: $vm.newFolderName)
             Button("Create") {

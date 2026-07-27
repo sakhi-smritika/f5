@@ -24,8 +24,24 @@ struct KbitsFeedView: View {
                 get: { viewModel?.discussionBit },
                 set: { viewModel?.discussionBit = $0 }
             )) { bit in
-                KbitDiscussionSheet(bit: bit, apiClient: dependencies.apiClient)
+                KbitDiscussionSheet(bit: bit, viewModel: discussionViewModel(for: bit))
             }
+        }
+    }
+
+    /// Shares the app-wide thread registry with the chat list, so a discussion
+    /// opened from either place is the same live conversation.
+    private func discussionViewModel(for bit: KnowledgeBit) -> ChatThreadViewModel {
+        dependencies.threadRegistry.viewModel(for: .kbit(bit.id)) {
+            ChatThreadViewModel(
+                conversation: nil,
+                models: [],
+                selectedModelId: "",
+                apiClient: dependencies.apiClient,
+                cache: dependencies.cache,
+                refreshTracker: dependencies.refreshTracker,
+                bootstrapKbit: bit
+            )
         }
     }
 

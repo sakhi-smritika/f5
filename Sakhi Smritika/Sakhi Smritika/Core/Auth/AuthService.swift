@@ -20,6 +20,14 @@ final class AuthService {
     var user: User? { isAuthenticated ? session?.user : nil }
     var accessToken: String? { isAuthenticated ? session?.accessToken : nil }
 
+    /// Lets callers identify the account without importing the Supabase `Auth` module.
+    var userId: UUID? { user?.id }
+
+    /// Runs only for a user-initiated log out, not for an expired token, so a
+    /// transient 401 does not throw away the local cache.
+    @ObservationIgnored
+    var onExplicitSignOut: (@MainActor () -> Void)?
+
     @ObservationIgnored
     private var authListenerTask: Task<Void, Never>?
 
@@ -56,7 +64,7 @@ final class AuthService {
         }
     }
 
-    func signOut() async {
+    func signOut(clearLocalData: Bool = true) async {
         lastError = nil
         do {
             try await SupabaseManager.client.auth.signOut()
@@ -65,11 +73,14 @@ final class AuthService {
             lastError = error.localizedDescription
             session = nil
         }
+        if clearLocalData {
+            onExplicitSignOut?()
+        }
     }
 
     /// Called by `APIClient` on 401 responses.
     func handleUnauthorized() async {
-        await signOut()
+        await signOut(clearLocalData: false)
     }
 
     private func handle(event: AuthChangeEvent, session: Session?) {

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct GoalsListView: View {
     @Environment(AuthService.self) private var authService
+    @Environment(AppDependencies.self) private var dependencies
     @State private var viewModel: GoalsListViewModel?
 
     var body: some View {
@@ -30,9 +31,13 @@ struct GoalsListView: View {
         }
         .task {
             if viewModel == nil {
-                viewModel = GoalsListViewModel(authService: authService)
+                viewModel = GoalsListViewModel(
+                    authService: authService,
+                    cache: dependencies.cache,
+                    refreshTracker: dependencies.refreshTracker
+                )
             }
-            await viewModel?.load()
+            await viewModel?.appear()
         }
     }
 
@@ -102,6 +107,6 @@ struct GoalsListView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .refreshable { await vm.load() }
+        .refreshable { await vm.reload() }
     }
 }

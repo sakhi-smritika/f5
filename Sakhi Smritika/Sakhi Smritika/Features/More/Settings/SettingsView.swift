@@ -16,9 +16,13 @@ struct SettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             if viewModel == nil {
-                viewModel = SettingsViewModel(apiClient: dependencies.apiClient)
+                viewModel = SettingsViewModel(
+                    apiClient: dependencies.apiClient,
+                    cache: dependencies.cache,
+                    refreshTracker: dependencies.refreshTracker
+                )
             }
-            await viewModel?.load()
+            await viewModel?.appear()
         }
     }
 
@@ -95,7 +99,7 @@ struct SettingsView: View {
         .scrollContentBackground(.hidden)
         .background(Color(.systemGroupedBackground))
         .refreshable {
-            await vm.load()
+            await vm.reload()
         }
     }
 }

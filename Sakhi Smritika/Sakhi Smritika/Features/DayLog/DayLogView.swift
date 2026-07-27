@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DayLogView: View {
     @Environment(AuthService.self) private var authService
+    @Environment(AppDependencies.self) private var dependencies
     @State private var viewModel: DayLogViewModel?
 
     var body: some View {
@@ -17,9 +18,13 @@ struct DayLogView: View {
         }
         .task {
             if viewModel == nil {
-                viewModel = DayLogViewModel(authService: authService)
+                viewModel = DayLogViewModel(
+                    authService: authService,
+                    cache: dependencies.cache,
+                    refreshTracker: dependencies.refreshTracker
+                )
             }
-            await viewModel?.load()
+            await viewModel?.appear()
         }
     }
 
@@ -32,7 +37,7 @@ struct DayLogView: View {
                 DateNavigator(dateISO: $vm.dateISO)
                     .padding(.horizontal, 4)
                     .onChange(of: vm.dateISO) { _, _ in
-                        Task { await vm.load() }
+                        Task { await vm.dateChanged() }
                     }
 
                 if vm.isLoading {

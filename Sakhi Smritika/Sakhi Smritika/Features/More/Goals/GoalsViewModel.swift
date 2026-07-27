@@ -6,7 +6,6 @@ import Observation
 @Observable
 final class GoalsListViewModel {
     var goals: [Goal] = []
-    var isLoading = true
     var loadError: String?
     var showCreate = false
     var newName = ""
@@ -14,21 +13,56 @@ final class GoalsListViewModel {
     var newProgress = ""
     var createStatus: SaveStatus = .idle
 
-    private let authService: AuthService
+    private(set) var isRefreshing = false
+    private(set) var hasData = false
 
-    init(authService: AuthService) {
+    /// Only block the list with a spinner when there is nothing cached to show.
+    var isLoading: Bool { isRefreshing && !hasData }
+
+    private let authService: AuthService
+    private let cache: CacheStore
+    private let refreshTracker: SessionRefreshTracker
+
+    init(authService: AuthService, cache: CacheStore, refreshTracker: SessionRefreshTracker) {
         self.authService = authService
+        self.cache = cache
+        self.refreshTracker = refreshTracker
+        readFromCache()
     }
 
-    func load() async {
-        isLoading = true
+    func appear() async {
+        readFromCache()
+        guard refreshTracker.claim(RefreshKey.goals) else { return }
+        await refresh()
+    }
+
+    /// Pull to refresh always goes to the network.
+    func reload() async {
+        _ = refreshTracker.claim(RefreshKey.goals)
+        await refresh()
+    }
+
+    private func readFromCache() {
+        goals = cache.goals()
+        hasData = cache.hasSynced(RefreshKey.goals)
+    }
+
+    private func refresh() async {
+        isRefreshing = true
         loadError = nil
-        defer { isLoading = false }
+        defer { isRefreshing = false }
 
         do {
-            goals = try await GoalsService.listGoals()
+            let loaded = try await GoalsService.listGoals()
+            goals = loaded
+            hasData = true
+            cache.replaceGoals(loaded)
+            cache.markSynced(RefreshKey.goals)
         } catch {
-            loadError = error.localizedDescription
+            refreshTracker.release(RefreshKey.goals)
+            if !hasData {
+                loadError = error.localizedDescription
+            }
         }
     }
 
@@ -57,7 +91,7 @@ final class GoalsListViewModel {
             newProgress = ""
             showCreate = false
             createStatus = .idle
-            await load()
+            await refresh()
         } catch {
             createStatus = .error(error.localizedDescription)
         }
@@ -81,7 +115,6 @@ final class GoalDetailViewModel {
     var breadcrumb: [Goal] = []
     var allGoals: [Goal] = []
 
-    var isLoading = true
     var loadError: String?
     var saveStatus: SaveStatus = .idle
     var showCreateChild = false
@@ -91,40 +124,89 @@ final class GoalDetailViewModel {
     var createChildStatus: SaveStatus = .idle
     var didDelete = false
 
-    private let authService: AuthService
+    private(set) var isRefreshing = false
+    private(set) var hasData = false
 
-    init(goalId: UUID, authService: AuthService) {
+    /// Only block the form with a spinner when there is nothing cached to show.
+    var isLoading: Bool { isRefreshing && !hasData }
+
+    /// Guards the editable fields: a background refresh must never overwrite text
+    /// the user is in the middle of typing.
+    private var hasUnsavedEdits = false
+
+    private let authService: AuthService
+    private let cache: CacheStore
+    private let refreshTracker: SessionRefreshTracker
+
+    init(
+        goalId: UUID,
+        authService: AuthService,
+        cache: CacheStore,
+        refreshTracker: SessionRefreshTracker
+    ) {
         self.goalId = goalId
         self.authService = authService
+        self.cache = cache
+        self.refreshTracker = refreshTracker
+        readFromCache()
     }
 
-    func load() async {
-        isLoading = true
+    func appear() async {
+        guard !hasUnsavedEdits else { return }
+        readFromCache()
+        guard refreshTracker.claim(RefreshKey.goals) else { return }
+        await refresh()
+    }
+
+    private func readFromCache() {
+        let cached = cache.goals()
+        guard !cached.isEmpty, let goal = cached.first(where: { $0.id == goalId }) else { return }
+        apply(goal, allGoals: cached)
+        hasData = true
+    }
+
+    private func apply(_ goal: Goal, allGoals: [Goal]) {
+        self.allGoals = allGoals
+        goalName = goal.goalName
+        goalDescription = goal.goalDescription ?? ""
+        progress = goal.progress ?? ""
+        breadcrumb = GoalsService.breadcrumb(goals: allGoals, goalId: goalId)
+        // `listGoals` returns every goal in the same order `childGoals` would, so
+        // the children are already here — no second request needed.
+        children = allGoals.filter { $0.parentGoal == goalId }
+    }
+
+    private func refresh() async {
+        isRefreshing = true
         loadError = nil
-        defer { isLoading = false }
+        defer { isRefreshing = false }
 
         do {
-            allGoals = try await GoalsService.listGoals()
-            let goal: Goal
-            if let cached = allGoals.first(where: { $0.id == goalId }) {
-                goal = cached
+            let loaded = try await GoalsService.listGoals()
+            cache.replaceGoals(loaded)
+            cache.markSynced(RefreshKey.goals)
+
+            guard !hasUnsavedEdits else { return }
+            if let goal = loaded.first(where: { $0.id == goalId }) {
+                apply(goal, allGoals: loaded)
+                hasData = true
             } else if let fetched = try await GoalsService.goal(id: goalId) {
-                goal = fetched
-            } else {
+                cache.upsertGoal(fetched)
+                apply(fetched, allGoals: loaded)
+                hasData = true
+            } else if !hasData {
                 loadError = "Goal not found."
-                return
             }
-            goalName = goal.goalName
-            goalDescription = goal.goalDescription ?? ""
-            progress = goal.progress ?? ""
-            breadcrumb = GoalsService.breadcrumb(goals: allGoals, goalId: goalId)
-            children = try await GoalsService.childGoals(parentId: goalId)
         } catch {
-            loadError = error.localizedDescription
+            refreshTracker.release(RefreshKey.goals)
+            if !hasData {
+                loadError = error.localizedDescription
+            }
         }
     }
 
     func markEdited() {
+        hasUnsavedEdits = true
         if saveStatus != .idle { saveStatus = .idle }
     }
 
@@ -145,8 +227,11 @@ final class GoalDetailViewModel {
             goalName = saved.goalName
             goalDescription = saved.goalDescription ?? ""
             progress = saved.progress ?? ""
+            cache.upsertGoal(saved)
+            hasUnsavedEdits = false
+            hasData = true
             saveStatus = .saved
-            await load()
+            await refresh()
         } catch {
             saveStatus = .error(error.localizedDescription)
         }
@@ -176,7 +261,7 @@ final class GoalDetailViewModel {
             childProgress = ""
             showCreateChild = false
             createChildStatus = .idle
-            await load()
+            await refresh()
         } catch {
             createChildStatus = .error(error.localizedDescription)
         }
@@ -185,6 +270,7 @@ final class GoalDetailViewModel {
     func delete() async {
         do {
             try await GoalsService.delete(id: goalId)
+            cache.deleteGoal(id: goalId)
             didDelete = true
         } catch {
             saveStatus = .error(error.localizedDescription)

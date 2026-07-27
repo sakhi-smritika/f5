@@ -5,32 +5,60 @@ import Observation
 @Observable
 final class SettingsViewModel {
     private let apiClient: APIClient
+    private let cache: CacheStore
+    private let refreshTracker: SessionRefreshTracker
     private let oauthPresenter = GoogleOAuthPresenter()
 
     var status: GoogleConnectionStatus?
-    var isLoading = false
     var isBusy = false
     var loadError: String?
     var actionError: String?
     var flashMessage: String?
 
-    init(apiClient: APIClient) {
+    private(set) var isRefreshing = false
+
+    /// Only show the placeholder spinner when there is nothing cached to show.
+    var isLoading: Bool { isRefreshing && status == nil }
+
+    init(apiClient: APIClient, cache: CacheStore, refreshTracker: SessionRefreshTracker) {
         self.apiClient = apiClient
+        self.cache = cache
+        self.refreshTracker = refreshTracker
+        status = cache.googleStatus()
     }
 
     var isConnected: Bool {
         status?.connected ?? false
     }
 
-    func load() async {
-        isLoading = true
+    func appear() async {
+        if status == nil {
+            status = cache.googleStatus()
+        }
+        guard refreshTracker.claim(RefreshKey.integrations) else { return }
+        await refresh()
+    }
+
+    /// Pull to refresh always goes to the network.
+    func reload() async {
+        _ = refreshTracker.claim(RefreshKey.integrations)
+        await refresh()
+    }
+
+    private func refresh() async {
+        isRefreshing = true
         loadError = nil
-        defer { isLoading = false }
+        defer { isRefreshing = false }
 
         do {
-            status = try await IntegrationsService.googleStatus(api: apiClient)
+            let loaded = try await IntegrationsService.googleStatus(api: apiClient)
+            status = loaded
+            cache.setGoogleStatus(loaded)
         } catch {
-            loadError = error.localizedDescription
+            refreshTracker.release(RefreshKey.integrations)
+            if status == nil {
+                loadError = error.localizedDescription
+            }
         }
     }
 
@@ -61,7 +89,9 @@ final class SettingsViewModel {
             if actionError != nil {
                 return
             }
-            status = try await IntegrationsService.googleStatus(api: apiClient)
+            let loaded = try await IntegrationsService.googleStatus(api: apiClient)
+            status = loaded
+            cache.setGoogleStatus(loaded)
         } catch is CancellationError {
             // User dismissed the sheet — no error.
         } catch {
@@ -77,7 +107,9 @@ final class SettingsViewModel {
 
         do {
             try await IntegrationsService.disconnectGoogle(api: apiClient)
-            status = GoogleConnectionStatus(connected: false, googleEmail: nil, connectedAt: nil)
+            let disconnected = GoogleConnectionStatus(connected: false, googleEmail: nil, connectedAt: nil)
+            status = disconnected
+            cache.setGoogleStatus(disconnected)
             flashMessage = "Google disconnected."
         } catch {
             actionError = error.localizedDescription

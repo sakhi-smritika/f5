@@ -4,6 +4,7 @@ struct GoalDetailView: View {
     let goalId: UUID
 
     @Environment(AuthService.self) private var authService
+    @Environment(AppDependencies.self) private var dependencies
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: GoalDetailViewModel?
     @State private var showDeleteConfirm = false
@@ -45,9 +46,14 @@ struct GoalDetailView: View {
         }
         .task {
             if viewModel == nil {
-                viewModel = GoalDetailViewModel(goalId: goalId, authService: authService)
+                viewModel = GoalDetailViewModel(
+                    goalId: goalId,
+                    authService: authService,
+                    cache: dependencies.cache,
+                    refreshTracker: dependencies.refreshTracker
+                )
             }
-            await viewModel?.load()
+            await viewModel?.appear()
         }
     }
 
