@@ -8,62 +8,46 @@ enum MoreDestination: String, Identifiable {
     var id: String { rawValue }
 }
 
-/// Compact icon stack matching the web settings / introspection flyout.
-struct MoreMenuView: View {
-    let onSelect: (MoreDestination) -> Void
+/// Root of the More tab: entry points for the secondary screens plus sign out.
+struct MoreView: View {
     let onSignOut: () -> Void
 
-    private let iconSize: CGFloat = 40
-
     var body: some View {
-        VStack(spacing: 4) {
-            moreIconButton(systemImage: "person.crop.circle", label: "Profile") {
-                onSelect(.profile)
-            }
-            moreIconButton(systemImage: "target", label: "Goals") {
-                onSelect(.goals)
-            }
-            moreIconButton(systemImage: "gearshape", label: "Settings") {
-                onSelect(.settings)
-            }
+        NavigationStack {
+            List {
+                Section {
+                    row(.profile, systemImage: "person.crop.circle", label: "Profile")
+                    row(.goals, systemImage: "target", label: "Goals")
+                    row(.settings, systemImage: "gearshape", label: "Settings")
+                }
 
-            Rectangle()
-                .fill(.separator.opacity(0.5))
-                .frame(width: iconSize - 12, height: 1)
-                .padding(.vertical, 2)
-
-            moreIconButton(
-                systemImage: "rectangle.portrait.and.arrow.right",
-                label: "Log out",
-                tint: .red,
-                action: onSignOut
-            )
+                Section {
+                    Button(role: .destructive, action: onSignOut) {
+                        Label("Log out", systemImage: "rectangle.portrait.and.arrow.right")
+                    }
+                }
+            }
+            .navigationTitle("More")
+            .navigationDestination(for: MoreDestination.self) { destination in
+                switch destination {
+                case .profile:
+                    ProfileView()
+                case .goals:
+                    GoalsListView()
+                case .settings:
+                    SettingsView()
+                }
+            }
         }
-        .padding(4)
-        .frame(width: iconSize + 8)
-        .fixedSize()
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(.separator.opacity(0.5), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
     }
 
-    private func moreIconButton(
+    private func row(
+        _ destination: MoreDestination,
         systemImage: String,
-        label: String,
-        tint: Color = .primary,
-        action: @escaping () -> Void
+        label: String
     ) -> some View {
-        Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.system(size: 18, weight: .regular))
-                .foregroundStyle(tint)
-                .frame(width: iconSize, height: iconSize)
-                .contentShape(Rectangle())
+        NavigationLink(value: destination) {
+            Label(label, systemImage: systemImage)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(label)
     }
 }
