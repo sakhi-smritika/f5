@@ -12,6 +12,7 @@ RECENT_TITLES_LIMIT = 100
 UPDATABLE_FIELDS: frozenset[str] = frozenset(
     {
         "is_read",
+        "is_viewed",
         "is_liked",
         "is_disliked",
         "rating",

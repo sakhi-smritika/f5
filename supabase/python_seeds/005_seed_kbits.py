@@ -38,6 +38,7 @@ logger = logging.getLogger(__name__)
 # Interaction flags copied straight through when present in a seed entry.
 INTERACTION_FIELDS = (
     "is_read",
+    "is_viewed",
     "is_liked",
     "is_disliked",
     "rating",

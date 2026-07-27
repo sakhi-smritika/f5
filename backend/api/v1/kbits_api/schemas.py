@@ -27,6 +27,7 @@ class UpdateKbitBody(BaseModel):
     """Body for ``PATCH /kbits/{id}`` — interaction flags only."""
 
     is_read: bool | None = None
+    is_viewed: bool | None = None
     is_liked: bool | None = None
     is_disliked: bool | None = None
     rating: int | None = None

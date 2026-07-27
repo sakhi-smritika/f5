@@ -2,20 +2,17 @@ import Foundation
 import Supabase
 
 enum KbitService {
-    static func listKbits(unreadOnly: Bool = false) async throws -> [KnowledgeBit] {
-        if unreadOnly {
-            return try await SupabaseManager.client
-                .from("knowledge_bits")
-                .select()
-                .eq("is_read", value: false)
-                .order("created_at", ascending: false)
-                .execute()
-                .value
-        }
-        return try await SupabaseManager.client
+    static func listKbits(unviewedOnly: Bool = false) async throws -> [KnowledgeBit] {
+        var query = SupabaseManager.client
             .from("knowledge_bits")
             .select()
-            .order("created_at", ascending: false)
+
+        if unviewedOnly {
+            query = query.eq("is_viewed", value: false)
+        }
+
+        return try await query
+            .order("position", ascending: true)
             .execute()
             .value
     }

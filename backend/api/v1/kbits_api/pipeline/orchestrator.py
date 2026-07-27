@@ -19,6 +19,8 @@ from .query import QUERY_STRATEGIES
 from .ranker import RANK_STRATEGIES
 from .screener import SCREEN_STRATEGIES
 
+from ..access import KBIT_COLUMNS
+
 logger = logging.getLogger(__name__)
 
 _GOAL_COLUMNS = "id, goal_name, goal_description, progress, parent_goal"
@@ -125,6 +127,7 @@ def _persist(
         get_supabase_service_client()
         .table("knowledge_bits")
         .insert(rows)
+        .select(KBIT_COLUMNS)
         .execute()
     )
     logger.info(

@@ -12,17 +12,10 @@ final class KbitsFeedViewModel {
     var loadError: String?
     var generateError: String?
 
-    var catalog: StrategyCatalog?
-    var showGenerateOptions = false
-    var generateCount = 5
-    var queryStrategy = ""
-    var generatorStrategy = ""
-    var screenStrategy = ""
-    var rankStrategy = ""
-
     var discussionBit: KnowledgeBit?
 
-    private var autoReadAttempted: Set<UUID> = []
+    private var autoViewAttempted: Set<UUID> = []
+    private var invokeTriggeredForLastId: UUID?
     private let apiClient: APIClient
 
     init(apiClient: APIClient) {
@@ -32,56 +25,80 @@ final class KbitsFeedViewModel {
     func load() async {
         isLoading = true
         loadError = nil
+        invokeTriggeredForLastId = nil
         defer { isLoading = false }
 
         do {
-            async let bitsTask = KbitService.listKbits()
+            async let bitsTask = KbitService.listKbits(unviewedOnly: true)
             async let mapTask = KbitService.discussionMap()
             bits = try await bitsTask
             discussedKbitIds = Set((try await mapTask).keys)
-            if currentIndex >= bits.count {
-                currentIndex = max(0, bits.count - 1)
+            currentIndex = 0
+
+            if bits.isEmpty {
+                await invokeMore()
             }
         } catch {
             loadError = error.localizedDescription
         }
+    }
 
-        if catalog == nil {
-            catalog = try? await KbitService.strategies(api: apiClient)
+    func onCardVisible(at index: Int, bit: KnowledgeBit) {
+        if index > currentIndex {
+            markViewed(bitAt: currentIndex)
+        }
+        currentIndex = index
+
+        if index == bits.count - 1 {
+            Task { await loadMoreIfNeeded(triggerBitId: bit.id) }
         }
     }
 
-    func generate() async {
+    func onLoadingCardVisible() {
+        markViewed(bitAt: currentIndex)
+        currentIndex = bits.count
+    }
+
+    private func markViewed(bitAt index: Int) {
+        guard index >= 0, index < bits.count else { return }
+        markViewed(bits[index])
+    }
+
+    private func markViewed(_ bit: KnowledgeBit) {
+        guard !bit.isViewed, !autoViewAttempted.contains(bit.id) else { return }
+        autoViewAttempted.insert(bit.id)
+        Task {
+            patch(bit.id) { $0.isViewed = true }
+            try? await KbitService.updateKbit(id: bit.id, updates: KbitUpdate(isViewed: true))
+        }
+    }
+
+    func loadMoreIfNeeded(triggerBitId: UUID) async {
+        guard !isGenerating else { return }
+        guard invokeTriggeredForLastId != triggerBitId else { return }
+        invokeTriggeredForLastId = triggerBitId
+        await invokeMore()
+    }
+
+    func invokeMore() async {
         isGenerating = true
         generateError = nil
         defer { isGenerating = false }
 
-        var body = InvokeKbitsBody(count: generateCount)
-        body.queryStrategy = queryStrategy.nilIfEmpty
-        body.generatorStrategy = generatorStrategy.nilIfEmpty
-        body.screenStrategy = screenStrategy.nilIfEmpty
-        body.rankStrategy = rankStrategy.nilIfEmpty
-
         do {
-            let created = try await KbitService.invoke(api: apiClient, body: body)
+            let created = try await KbitService.invoke(
+                api: apiClient,
+                body: InvokeKbitsBody(count: 5)
+            )
             if created.isEmpty {
                 generateError = "No new bits were generated."
+                invokeTriggeredForLastId = nil
             } else {
-                bits.insert(contentsOf: created, at: 0)
-                currentIndex = 0
-                showGenerateOptions = false
+                appendNewBits(created)
             }
         } catch {
             generateError = error.localizedDescription
-        }
-    }
-
-    func markVisible(_ bit: KnowledgeBit) {
-        guard !bit.isRead, !autoReadAttempted.contains(bit.id) else { return }
-        autoReadAttempted.insert(bit.id)
-        Task {
-            patch(bit.id) { $0.isRead = true }
-            try? await KbitService.updateKbit(id: bit.id, updates: KbitUpdate(isRead: true))
+            invokeTriggeredForLastId = nil
         }
     }
 
@@ -169,9 +186,15 @@ final class KbitsFeedViewModel {
         if currentIndex >= bits.count {
             currentIndex = max(0, bits.count - 1)
         }
+        invokeTriggeredForLastId = nil
         Task {
             do {
                 try await KbitService.delete(api: apiClient, id: bit.id)
+                if bits.isEmpty {
+                    await invokeMore()
+                } else if currentIndex >= bits.count - 1, let last = bits.last {
+                    await loadMoreIfNeeded(triggerBitId: last.id)
+                }
             } catch {
                 bits = previous
                 generateError = error.localizedDescription
@@ -184,14 +207,16 @@ final class KbitsFeedViewModel {
         discussedKbitIds.insert(bit.id)
     }
 
+    private func appendNewBits(_ created: [KnowledgeBit]) {
+        let existingIds = Set(bits.map(\.id))
+        let newBits = created
+            .filter { !existingIds.contains($0.id) }
+            .sorted { $0.position < $1.position }
+        bits.append(contentsOf: newBits)
+    }
+
     private func patch(_ id: UUID, _ mutate: (inout KnowledgeBit) -> Void) {
         guard let index = bits.firstIndex(where: { $0.id == id }) else { return }
         mutate(&bits[index])
-    }
-}
-
-private extension String {
-    var nilIfEmpty: String? {
-        trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : self
     }
 }

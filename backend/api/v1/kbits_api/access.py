@@ -13,8 +13,9 @@ from .constants import RECENT_TITLES_LIMIT
 
 # Columns returned to the client. ``user_id`` is intentionally omitted.
 KBIT_COLUMNS = (
-    "id, created_at, updated_at, title, content, related_goal, is_read, "
-    "is_liked, is_disliked, rating, is_marked_relavant, is_marked_irrelavant"
+    "id, created_at, updated_at, title, content, related_goal, position, "
+    "is_read, is_viewed, is_liked, is_disliked, rating, "
+    "is_marked_relavant, is_marked_irrelavant"
 )
 
 
@@ -41,11 +42,12 @@ def list_kbits(
     user_id: str,
     *,
     is_read: bool | None = None,
+    is_viewed: bool | None = None,
     related_goal: str | None = None,
     limit: int = 20,
     offset: int = 0,
 ) -> list[dict]:
-    """Return the user's bits, newest first, with optional filters."""
+    """Return the user's bits in feed order (position ascending)."""
     query = (
         get_supabase_service_client()
         .table("knowledge_bits")
@@ -54,11 +56,13 @@ def list_kbits(
     )
     if is_read is not None:
         query = query.eq("is_read", is_read)
+    if is_viewed is not None:
+        query = query.eq("is_viewed", is_viewed)
     if related_goal:
         query = query.eq("related_goal", related_goal)
 
     result = (
-        query.order("created_at", desc=True)
+        query.order("position", desc=False)
         .range(offset, offset + max(1, limit) - 1)
         .execute()
     )

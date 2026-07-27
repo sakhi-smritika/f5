@@ -7,7 +7,9 @@ struct KnowledgeBit: Codable, Identifiable, Hashable, Sendable {
     var title: String
     var content: String
     var relatedGoal: UUID?
+    var position: Int
     var isRead: Bool
+    var isViewed: Bool
     var isLiked: Bool
     var isDisliked: Bool
     var rating: Double?
@@ -23,7 +25,9 @@ struct KnowledgeBit: Codable, Identifiable, Hashable, Sendable {
         case title
         case content
         case relatedGoal = "related_goal"
+        case position
         case isRead = "is_read"
+        case isViewed = "is_viewed"
         case isLiked = "is_liked"
         case isDisliked = "is_disliked"
         case rating
@@ -92,6 +96,7 @@ struct InvokeKbitsResponse: Codable, Sendable {
 
 struct KbitUpdate: Encodable, Sendable {
     var isRead: Bool? = nil
+    var isViewed: Bool? = nil
     var isLiked: Bool? = nil
     var isDisliked: Bool? = nil
     var rating: Double? = nil
@@ -100,6 +105,7 @@ struct KbitUpdate: Encodable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case isRead = "is_read"
+        case isViewed = "is_viewed"
         case isLiked = "is_liked"
         case isDisliked = "is_disliked"
         case rating
@@ -110,6 +116,7 @@ struct KbitUpdate: Encodable, Sendable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         if let isRead { try container.encode(isRead, forKey: .isRead) }
+        if let isViewed { try container.encode(isViewed, forKey: .isViewed) }
         if let isLiked { try container.encode(isLiked, forKey: .isLiked) }
         if let isDisliked { try container.encode(isDisliked, forKey: .isDisliked) }
         if let rating { try container.encode(rating, forKey: .rating) }

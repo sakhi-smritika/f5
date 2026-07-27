@@ -14,28 +14,6 @@ struct KbitsFeedView: View {
                 }
             }
             .navigationTitle("Kbits")
-            .toolbar {
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    Button {
-                        viewModel?.showGenerateOptions.toggle()
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                    }
-                    .accessibilityLabel("Generate options")
-
-                    Button {
-                        Task { await viewModel?.generate() }
-                    } label: {
-                        if viewModel?.isGenerating == true {
-                            ProgressView()
-                        } else {
-                            Image(systemName: "sparkles")
-                        }
-                    }
-                    .disabled(viewModel?.isGenerating == true)
-                    .accessibilityLabel("Generate knowledge bits")
-                }
-            }
             .task {
                 if viewModel == nil {
                     viewModel = KbitsFeedViewModel(apiClient: dependencies.apiClient)
@@ -48,14 +26,6 @@ struct KbitsFeedView: View {
             )) { bit in
                 KbitDiscussionSheet(bit: bit, apiClient: dependencies.apiClient)
             }
-            .sheet(isPresented: Binding(
-                get: { viewModel?.showGenerateOptions ?? false },
-                set: { viewModel?.showGenerateOptions = $0 }
-            )) {
-                if let viewModel {
-                    GenerateKbitsSheet(viewModel: viewModel)
-                }
-            }
         }
     }
 
@@ -65,46 +35,54 @@ struct KbitsFeedView: View {
 
         ZStack {
             if vm.isLoading && vm.bits.isEmpty {
-                LoadingView()
-            } else if let loadError = vm.loadError, vm.bits.isEmpty {
+                LoadingView(message: vm.isGenerating ? "Finding new bits…" : "Loading bits…")
+            } else if let loadError = vm.loadError, vm.bits.isEmpty, !vm.isGenerating {
                 ContentUnavailableView(
                     "Couldn't load bits",
                     systemImage: "exclamationmark.triangle",
                     description: Text(loadError)
                 )
-            } else if vm.bits.isEmpty {
+            } else if vm.bits.isEmpty && !vm.isGenerating {
                 ContentUnavailableView(
-                    "No knowledge bits yet",
+                    "No new bits right now",
                     systemImage: "sparkles",
-                    description: Text("Tap sparkles to generate insights from your goals and profile.")
+                    description: Text("Pull down to refresh, or check back later.")
                 )
             } else {
-                ScrollView(.vertical) {
-                    LazyVStack(spacing: 0) {
-                        ForEach(Array(vm.bits.enumerated()), id: \.element.id) { index, bit in
-                            KbitCardView(
-                                bit: bit,
-                                hasDiscussion: vm.discussedKbitIds.contains(bit.id),
-                                onLike: { vm.toggleLike(bit) },
-                                onDislike: { vm.toggleDislike(bit) },
-                                onRelevant: { vm.toggleRelevant(bit) },
-                                onIrrelevant: { vm.toggleIrrelevant(bit) },
-                                onDiscuss: { vm.openDiscussion(bit) },
-                                onDelete: { vm.delete(bit) },
-                                onBecameVisible: {
-                                    vm.currentIndex = index
-                                    vm.markVisible(bit)
-                                }
-                            )
-                            .containerRelativeFrame(.vertical)
-                            .id(bit.id)
+                GeometryReader { geo in
+                    ScrollView(.vertical) {
+                        LazyVStack(spacing: 0) {
+                            ForEach(Array(vm.bits.enumerated()), id: \.element.id) { index, bit in
+                                KbitCardView(
+                                    bit: bit,
+                                    hasDiscussion: vm.discussedKbitIds.contains(bit.id),
+                                    onLike: { vm.toggleLike(bit) },
+                                    onDislike: { vm.toggleDislike(bit) },
+                                    onRelevant: { vm.toggleRelevant(bit) },
+                                    onIrrelevant: { vm.toggleIrrelevant(bit) },
+                                    onDiscuss: { vm.openDiscussion(bit) },
+                                    onDelete: { vm.delete(bit) },
+                                    onBecameVisible: {
+                                        vm.onCardVisible(at: index, bit: bit)
+                                    }
+                                )
+                                .frame(width: geo.size.width, height: geo.size.height)
+                                .id(bit.id)
+                            }
+
+                            if vm.isGenerating {
+                                KbitLoadingCardView()
+                                    .frame(width: geo.size.width, height: geo.size.height)
+                                    .id("loading")
+                                    .onAppear { vm.onLoadingCardVisible() }
+                            }
                         }
+                        .scrollTargetLayout()
                     }
-                    .scrollTargetLayout()
+                    .scrollTargetBehavior(.paging)
+                    .scrollIndicators(.hidden)
+                    .refreshable { await vm.load() }
                 }
-                .scrollTargetBehavior(.paging)
-                .scrollIndicators(.hidden)
-                .refreshable { await vm.load() }
             }
 
             if let generateError = vm.generateError {
@@ -122,67 +100,16 @@ struct KbitsFeedView: View {
     }
 }
 
-struct GenerateKbitsSheet: View {
-    @Bindable var viewModel: KbitsFeedViewModel
-    @Environment(\.dismiss) private var dismiss
-
+private struct KbitLoadingCardView: View {
     var body: some View {
-        NavigationStack {
-            Form {
-                Section("Count") {
-                    Stepper(value: $viewModel.generateCount, in: 1...20) {
-                        Text("\(viewModel.generateCount) bits")
-                    }
-                }
-
-                if let catalog = viewModel.catalog {
-                    strategyPicker("Query", selection: $viewModel.queryStrategy, stage: catalog.query)
-                    strategyPicker("Generator", selection: $viewModel.generatorStrategy, stage: catalog.generator)
-                    strategyPicker("Screen", selection: $viewModel.screenStrategy, stage: catalog.screen)
-                    strategyPicker("Rank", selection: $viewModel.rankStrategy, stage: catalog.rank)
-                } else {
-                    Section {
-                        Text("Strategy catalog unavailable — defaults will be used.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            .navigationTitle("Generate")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Generate") {
-                        Task {
-                            await viewModel.generate()
-                            if viewModel.generateError == nil {
-                                dismiss()
-                            }
-                        }
-                    }
-                    .disabled(viewModel.isGenerating)
-                }
-            }
+        VStack(spacing: 16) {
+            ProgressView()
+            Text("Loading more bits…")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
-        .presentationDetents([.medium, .large])
-    }
-
-    private func strategyPicker(
-        _ title: String,
-        selection: Binding<String>,
-        stage: StageStrategies
-    ) -> some View {
-        Section(title) {
-            Picker(title, selection: selection) {
-                Text(stage.defaultStrategy.map { "Default (\($0))" } ?? "Default")
-                    .tag("")
-                ForEach(stage.options, id: \.self) { option in
-                    Text(option).tag(option)
-                }
-            }
-        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
     }
 }

@@ -13,45 +13,60 @@ struct KbitCardView: View {
 
     var body: some View {
         GeometryReader { geo in
-            ZStack(alignment: .bottom) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        HStack {
-                            if !bit.isRead {
-                                Text("NEW")
-                                    .font(.caption2.weight(.bold))
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Color.accentColor.opacity(0.2), in: Capsule())
-                            }
-                            Spacer()
-                        }
-
-                        Text(bit.title)
-                            .font(.title2.weight(.semibold))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-
-                        Text(bit.content)
-                            .font(.body)
-                            .foregroundStyle(.primary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .textSelection(.enabled)
-
-                        Spacer(minLength: 100)
-                    }
-                    .padding(20)
-                    .padding(.bottom, 24)
-                    .frame(minHeight: geo.size.height)
-                }
-                .scrollIndicators(.hidden)
-
-                actionBar
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 16)
-            }
-            .background(Color(.systemBackground))
-            .onAppear(perform: onBecameVisible)
+            cardContent(in: geo.size)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .frame(width: geo.size.width, height: geo.size.height)
+                .onAppear(perform: onBecameVisible)
         }
+    }
+
+    private func cardContent(in size: CGSize) -> some View {
+        ZStack(alignment: .bottom) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        if !bit.isViewed {
+                            Text("NEW")
+                                .font(.caption2.weight(.bold))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.accentColor.opacity(0.2), in: Capsule())
+                        }
+                        Spacer()
+                    }
+
+                    Text(bit.title)
+                        .font(.title2.weight(.semibold))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Text(bit.content)
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+
+                    Spacer(minLength: 88)
+                }
+                .padding(20)
+                .frame(minHeight: size.height - 20)
+            }
+            .scrollIndicators(.hidden)
+
+            actionBar
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(
+            Color(.secondarySystemGroupedBackground),
+            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     private var actionBar: some View {

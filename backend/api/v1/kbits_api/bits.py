@@ -19,15 +19,17 @@ router = APIRouter(prefix="/kbits", tags=["kbits"])
 @router.get("")
 def get_feed(
     is_read: bool | None = Query(default=None),
+    is_viewed: bool | None = Query(default=None),
     related_goal: str | None = Query(default=None),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     user: AuthenticatedUser = Depends(get_current_user),
 ) -> dict:
-    """Return the user's knowledge-bit feed, newest first."""
+    """Return the user's knowledge-bit feed in position order."""
     bits = list_kbits(
         user.id,
         is_read=is_read,
+        is_viewed=is_viewed,
         related_goal=related_goal,
         limit=limit,
         offset=offset,
