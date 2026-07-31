@@ -27,11 +27,17 @@ class Query:
     against ``include``, and the screen stage treats ``exclude`` as redundant
     ground. ``brief`` is optional prose — an agent-built query uses it to explain
     what this user needs right now, which terms alone cannot carry.
+
+    ``graph_id`` and ``expansion_node_id`` are set by graph query strategies for
+    post-generation enrichment; they are not part of the public invoke API.
     """
 
     include: list[str] = field(default_factory=list)
     exclude: list[str] = field(default_factory=list)
     brief: str = ""
+    graph_id: str | None = None
+    expansion_node_id: str | None = None
+    rejected_titles: list[str] = field(default_factory=list)
 
     def to_text(self) -> str:
         """Flatten the query into plain text for a text/LLM-based generator."""
@@ -69,6 +75,9 @@ class PipelineContext:
     goals: list[dict] = field(default_factory=list)
     profile: dict = field(default_factory=dict)
     existing_titles: list[str] = field(default_factory=list)
+    graph_weights: dict[str, float] = field(default_factory=dict)
+    selected_graph_id: str | None = None
+    selected_node_id: str | None = None
 
 
 # --- Stage contracts (fixed I/O shapes) -------------------------------------

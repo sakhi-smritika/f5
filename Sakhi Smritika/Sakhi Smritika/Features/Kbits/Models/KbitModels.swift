@@ -1,5 +1,40 @@
 import Foundation
 
+struct KbitMetadataRef: Codable, Hashable, Sendable {
+    let id: String
+    let title: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case title
+    }
+}
+
+struct KbitMetadataNode: Codable, Hashable, Sendable {
+    let id: String
+    let label: String
+}
+
+struct KbitMetadata: Codable, Hashable, Sendable {
+    let queryStrategy: String?
+    let generatorStrategy: String?
+    let screenStrategy: String?
+    let rankStrategy: String?
+    let graph: KbitMetadataRef?
+    let expansionNode: KbitMetadataNode?
+    let newConcepts: [String]?
+
+    enum CodingKeys: String, CodingKey {
+        case queryStrategy = "query_strategy"
+        case generatorStrategy = "generator_strategy"
+        case screenStrategy = "screen_strategy"
+        case rankStrategy = "rank_strategy"
+        case graph
+        case expansionNode = "expansion_node"
+        case newConcepts = "new_concepts"
+    }
+}
+
 struct KnowledgeBit: Codable, Identifiable, Hashable, Sendable {
     let id: UUID
     let createdAt: String?
@@ -8,6 +43,7 @@ struct KnowledgeBit: Codable, Identifiable, Hashable, Sendable {
     var content: String
     var relatedGoal: UUID?
     var generatorPrompt: String?
+    var metadata: KbitMetadata?
     var position: Int
     var isRead: Bool
     var isViewed: Bool
@@ -27,6 +63,7 @@ struct KnowledgeBit: Codable, Identifiable, Hashable, Sendable {
         case content
         case relatedGoal = "related_goal"
         case generatorPrompt = "generator_prompt"
+        case metadata
         case position
         case isRead = "is_read"
         case isViewed = "is_viewed"
@@ -58,6 +95,8 @@ struct StrategyCatalog: Codable, Sendable {
 struct InvokeKbitsBody: Encodable, Sendable {
     var goalId: UUID? = nil
     var count: Int? = nil
+    var strategyWeights: StrategyWeightsPayload? = nil
+    var graphWeights: [String: Double]? = nil
     var queryStrategy: String? = nil
     var generatorStrategy: String? = nil
     var screenStrategy: String? = nil
@@ -66,6 +105,8 @@ struct InvokeKbitsBody: Encodable, Sendable {
     enum CodingKeys: String, CodingKey {
         case goalId = "goal_id"
         case count
+        case strategyWeights = "strategy_weights"
+        case graphWeights = "graph_weights"
         case queryStrategy = "query_strategy"
         case generatorStrategy = "generator_strategy"
         case screenStrategy = "screen_strategy"
@@ -76,6 +117,10 @@ struct InvokeKbitsBody: Encodable, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         if let goalId { try container.encode(goalId, forKey: .goalId) }
         if let count { try container.encode(count, forKey: .count) }
+        if let strategyWeights { try container.encode(strategyWeights, forKey: .strategyWeights) }
+        if let graphWeights, !graphWeights.isEmpty {
+            try container.encode(graphWeights, forKey: .graphWeights)
+        }
         if let queryStrategy, !queryStrategy.isEmpty {
             try container.encode(queryStrategy, forKey: .queryStrategy)
         }

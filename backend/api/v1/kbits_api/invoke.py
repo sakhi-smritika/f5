@@ -39,6 +39,10 @@ async def invoke(
     count = body.count or DEFAULT_INVOKE_COUNT
     count = max(1, min(count, MAX_INVOKE_COUNT))
 
+    strategy_weights = None
+    if body.strategy_weights is not None:
+        strategy_weights = body.strategy_weights.model_dump(exclude_none=True)
+
     try:
         bits = await invoke_kbits(
             user.id,
@@ -48,6 +52,8 @@ async def invoke(
             generator_strategy=body.generator_strategy,
             screen_strategy=body.screen_strategy,
             rank_strategy=body.rank_strategy,
+            strategy_weights=strategy_weights,
+            graph_weights=body.graph_weights,
         )
     except (KeyError, LookupError) as exc:
         raise HTTPException(

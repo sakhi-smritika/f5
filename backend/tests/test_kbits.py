@@ -65,10 +65,12 @@ class FakeTable:
         return self
 
     def execute(self):
-        if self._op == "select":
-            return SimpleNamespace(data=self._select_data)
         if self._op == "insert":
             return SimpleNamespace(data=self._last_insert or [])
+        if self._op == "select":
+            if self._last_insert is not None:
+                return SimpleNamespace(data=self._last_insert)
+            return SimpleNamespace(data=self._select_data)
         return SimpleNamespace(data=[])
 
 
@@ -105,6 +107,7 @@ def patch_kbits(monkeypatch):
             "api.v1.kbits_api.access",
             "api.v1.kbits_api.bits",
             "api.v1.kbits_api.pipeline.orchestrator",
+            "knowledge_graph.store",
         ):
             monkeypatch.setattr(
                 f"{module}.get_supabase_service_client", lambda: supabase
@@ -137,9 +140,11 @@ def test_list_strategies(client):
     body = response.json()
     assert set(body) == {"query", "generator", "screen", "rank"}
     assert body["generator"]["default"] == "llm"
-    assert "web_search" in body["generator"]["options"]
+    assert body["generator"]["options"] == ["llm"]
     assert body["query"]["default"] == "goals_profile"
     assert "agent" in body["query"]["options"]
+    assert "graph_potential" in body["query"]["options"]
+    assert "graph_agent" in body["query"]["options"]
 
 
 # --- invoke -----------------------------------------------------------------
@@ -154,8 +159,8 @@ def test_invoke_llm_generator_inserts_parsed_bits(client, patch_kbits, monkeypat
         _fake_llm('[{"title": "Focus", "content": "Deep work beats busywork."}]'),
     )
     monkeypatch.setattr(
-        "api.v1.kbits_api.pipeline.generators.get_api_key_for_model",
-        lambda model_id: "test-key",
+        "api.v1.kbits_api.pipeline.generators.get_litellm_kwargs",
+        lambda model_id: {"model": model_id, "api_key": "test-key"},
     )
 
     response = client.post("/api/v1/kbits/invoke", json={"count": 3})
@@ -178,8 +183,8 @@ def test_invoke_sets_related_goal(client, patch_kbits, monkeypatch):
         _fake_llm('[{"title": "A", "content": "B"}]'),
     )
     monkeypatch.setattr(
-        "api.v1.kbits_api.pipeline.generators.get_api_key_for_model",
-        lambda model_id: "test-key",
+        "api.v1.kbits_api.pipeline.generators.get_litellm_kwargs",
+        lambda model_id: {"model": model_id, "api_key": "test-key"},
     )
 
     response = client.post("/api/v1/kbits/invoke", json={"goal_id": "goal-9"})
@@ -262,8 +267,8 @@ def patch_agent_query(monkeypatch, patch_kbits):
             _recording_llm(json_content, calls),
         )
         monkeypatch.setattr(
-            "api.v1.kbits_api.pipeline.generators.get_api_key_for_model",
-            lambda model_id: "test-key",
+            "api.v1.kbits_api.pipeline.generators.get_litellm_kwargs",
+            lambda model_id: {"model": model_id, "api_key": "test-key"},
         )
 
         async def fake_build(count, goal_id=None, **kwargs):
@@ -449,3 +454,194 @@ def test_text_ranker_orders_by_overlap():
     ranked = TextRanker().rank(candidates, query)
 
     assert ranked[0].title == "Python"
+
+
+# --- weighted strategy resolver ---------------------------------------------
+
+
+def test_normalize_weights_scales_to_one():
+    from knowledge_graph.weights import normalize_weights
+
+    result = normalize_weights({"a": 2, "b": 2})
+    assert abs(sum(result.values()) - 1.0) < 1e-9
+    assert abs(result["a"] - 0.5) < 1e-9
+
+
+def test_resolve_stage_strategy_excludes_graph_when_no_graphs(monkeypatch):
+    from api.v1.kbits_api.pipeline.orchestrator import resolve_strategies
+
+    monkeypatch.setattr(
+        "api.v1.kbits_api.pipeline.orchestrator.count_user_graphs",
+        lambda user_id: 0,
+    )
+    resolved = resolve_strategies(
+        "user-1",
+        strategy_weights={
+            "query": {"graph_potential": 1.0, "goals_profile": 0.0},
+        },
+    )
+    assert resolved.query == "goals_profile"
+
+
+def test_graph_potential_builds_query_from_fixture(monkeypatch):
+    from api.v1.kbits_api.pipeline.base import PipelineContext
+    from api.v1.kbits_api.pipeline.query import GraphPotentialQuery
+
+    monkeypatch.setattr(
+        "api.v1.kbits_api.pipeline.query.list_user_graphs",
+        lambda user_id: [{"id": "g1", "title": "Agentic AI", "description": None}],
+    )
+    monkeypatch.setattr(
+        "api.v1.kbits_api.pipeline.query.load_graph_snapshot",
+        lambda graph_id, user_id: __import__(
+            "knowledge_graph.models", fromlist=["GraphSnapshot"]
+        ).GraphSnapshot(
+            id="g1",
+            title="Agentic AI",
+            description=None,
+            nodes=[
+                __import__(
+                    "knowledge_graph.models", fromlist=["GraphNode"]
+                ).GraphNode(id="n1", graph_id="g1", label="ReAct", kbit_count=0)
+            ],
+            neighbors={"n1": []},
+        ),
+    )
+    monkeypatch.setattr(
+        "api.v1.kbits_api.pipeline.query.pick_graph",
+        lambda weights, graphs: graphs[0],
+    )
+
+    ctx = PipelineContext(user_id="u1", graph_weights={"g1": 1.0})
+    query = __import__("asyncio").run(GraphPotentialQuery().build(ctx))
+
+    assert query.graph_id == "g1"
+    assert query.expansion_node_id == "n1"
+    assert "ReAct" in query.include[0]
+
+
+def test_build_generator_user_message_omits_existing_titles_from_prompt():
+    from api.v1.kbits_api.pipeline.base import Query
+    from api.v1.kbits_api.pipeline.generators import build_generator_user_message
+
+    query = Query(
+        include=["Planning loops"],
+        exclude=["Already covered title", "Another old bit"],
+        brief="Expand the concept.",
+    )
+    message = build_generator_user_message(query, 3)
+
+    assert "Already covered title" not in message
+    assert "Another old bit" not in message
+    assert "2 related bits" in message
+    assert "Planning loops" in message
+
+
+def test_invoke_writes_metadata_for_non_graph_strategy(client, patch_kbits, monkeypatch):
+    supabase = FakeSupabase(tables={"goals": [], "users": [], "knowledge_bits": []})
+    patch_kbits(supabase)
+    monkeypatch.setattr(
+        "api.v1.kbits_api.pipeline.generators.litellm",
+        _fake_llm('[{"title": "Focus", "content": "Deep work beats busywork."}]'),
+    )
+    monkeypatch.setattr(
+        "api.v1.kbits_api.pipeline.generators.get_litellm_kwargs",
+        lambda model_id: {"model": model_id, "api_key": "test-key"},
+    )
+    monkeypatch.setattr(
+        "api.v1.kbits_api.pipeline.orchestrator.count_user_graphs",
+        lambda user_id: 0,
+    )
+
+    response = client.post(
+        "/api/v1/kbits/invoke",
+        json={"count": 1, "query_strategy": "goals_profile"},
+    )
+
+    assert response.status_code == 200
+    metadata_update = supabase.table("knowledge_bits").updated[0]
+    assert metadata_update["metadata"]["query_strategy"] == "goals_profile"
+    assert response.json()["bits"][0]["metadata"]["query_strategy"] == "goals_profile"
+
+
+def test_invoke_writes_graph_metadata_even_when_enrichment_skipped(
+    client, patch_kbits, monkeypatch
+):
+    """Deterministic graph/strategy metadata is patched before graph enrichment."""
+    from knowledge_graph.models import GraphNode, GraphSnapshot
+
+    supabase = FakeSupabase(tables={"goals": [], "users": [], "knowledge_bits": []})
+    patch_kbits(supabase)
+    monkeypatch.setattr(
+        "api.v1.kbits_api.pipeline.generators.litellm",
+        _fake_llm('[{"title": "Focus", "content": "Deep work beats busywork."}]'),
+    )
+    monkeypatch.setattr(
+        "api.v1.kbits_api.pipeline.generators.get_litellm_kwargs",
+        lambda model_id: {"model": model_id, "api_key": "test-key"},
+    )
+    monkeypatch.setattr(
+        "api.v1.kbits_api.pipeline.orchestrator.count_user_graphs",
+        lambda user_id: 1,
+    )
+
+    snapshot = GraphSnapshot(
+        id="g1",
+        title="Agentic AI",
+        description=None,
+        nodes=[
+            GraphNode(id="n1", graph_id="g1", label="ReAct", kbit_count=0),
+        ],
+        neighbors={"n1": []},
+    )
+
+    async def fake_build(_self, ctx):
+        from api.v1.kbits_api.pipeline.base import Query
+
+        return Query(
+            include=["ReAct"],
+            exclude=[],
+            brief="Expand ReAct",
+            graph_id="g1",
+            expansion_node_id="579793501",
+        )
+
+    monkeypatch.setattr(
+        "api.v1.kbits_api.pipeline.query.GraphAgentQuery.build",
+        fake_build,
+    )
+    monkeypatch.setattr(
+        "api.v1.kbits_api.pipeline.orchestrator.load_graph_snapshot",
+        lambda graph_id, user_id: snapshot if graph_id == "g1" else None,
+    )
+    enrich_called = {"value": False}
+
+    async def fake_enrich(**kwargs):
+        enrich_called["value"] = True
+
+    monkeypatch.setattr(
+        "api.v1.kbits_api.pipeline.orchestrator.enrich_persisted_bits",
+        fake_enrich,
+    )
+    mark_called = {"value": False}
+
+    def fake_mark(node_id, *, increment_kbit_count=1):
+        mark_called["value"] = True
+
+    monkeypatch.setattr(
+        "api.v1.kbits_api.pipeline.orchestrator.mark_node_expanded",
+        fake_mark,
+    )
+
+    response = client.post(
+        "/api/v1/kbits/invoke",
+        json={"count": 1, "query_strategy": "graph_agent"},
+    )
+
+    assert response.status_code == 200
+    assert enrich_called["value"] is False
+    assert mark_called["value"] is False
+    metadata_update = supabase.table("knowledge_bits").updated[0]
+    assert metadata_update["metadata"]["query_strategy"] == "graph_agent"
+    assert metadata_update["metadata"]["graph"] == {"id": "g1", "title": "Agentic AI"}
+    assert "expansion_node" not in metadata_update["metadata"]

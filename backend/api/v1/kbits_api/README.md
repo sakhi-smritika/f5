@@ -21,7 +21,7 @@ kbits_api/
 └── pipeline/            # the generation pipeline (four strategy stages)
     ├── base.py          # Query, KBCandidate, PipelineContext, Protocols, Registry
     ├── query.py         # QUERY_STRATEGIES  (default: goals_profile; agent)
-    ├── generators.py    # GENERATOR_STRATEGIES (default: llm; web_search stub)
+    ├── generators.py    # GENERATOR_STRATEGIES (default: llm)
     ├── screener.py      # SCREEN_STRATEGIES (default: text)
     ├── ranker.py        # RANK_STRATEGIES   (default: text)
     └── orchestrator.py  # resolve strategies -> build -> generate -> screen -> rank -> insert
@@ -119,7 +119,6 @@ the strategy falls back to `goals_profile` rather than failing the invoke.
 | Name | What it does |
 |------|--------------|
 | `llm` (default) | One LiteLLM call that writes bits from `Query.to_text()` |
-| `web_search` | Stub; raises `NotImplementedError` |
 
 ### Adding a strategy
 

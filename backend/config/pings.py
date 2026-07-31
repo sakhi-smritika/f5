@@ -17,6 +17,7 @@ from google_auth_oauthlib.flow import Flow
 from supabase import create_client
 
 from config.google_oauth import GOOGLE_SCOPES
+from config.llm_keys import get_ollama_base_url
 
 DEFAULT_LITELLM_PING_PROMPT = "Reply with a short confirmation that the API key is working."
 
@@ -141,6 +142,31 @@ class Pings:
             model="anthropic/claude-3-5-sonnet-latest",
             provider_name="Anthropic",
         )
+
+
+    @staticmethod
+    @with_retries(retries=5)
+    def ping_ollama_base_url() -> bool:
+        """Check that the configured Ollama server is reachable."""
+        base_url = get_ollama_base_url()
+        try:
+            response = requests.get(f"{base_url}/api/tags", timeout=5)
+            response.raise_for_status()
+            logger.info(
+                "Ollama base URL check passed",
+                extra={"status": "success", "ollama_base_url": base_url},
+            )
+            return True
+        except Exception as e:
+            logger.error(
+                "Ollama base URL check failed",
+                extra={
+                    "status": "failure",
+                    "ollama_base_url": base_url,
+                    "error": str(e),
+                },
+            )
+            return False
 
 
     @staticmethod

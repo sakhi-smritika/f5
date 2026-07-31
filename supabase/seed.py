@@ -111,6 +111,8 @@ def run_seed_script(module_name: str, file_path: str) -> bool:
             main_func = getattr(module, "seed_diary", None)
         elif "seed_goals" in module_name:
             main_func = getattr(module, "seed_goals", None)
+        elif "seed_knowledge_graphs" in module_name:
+            main_func = getattr(module, "seed_knowledge_graphs", None)
         elif "seed_kbits" in module_name:
             main_func = getattr(module, "seed_kbits", None)
         elif "seed_activities" in module_name:
@@ -122,7 +124,7 @@ def run_seed_script(module_name: str, file_path: str) -> bool:
         if not main_func:
             print_error(f"No main function found in {module_name}")
             print_info(
-                "Expected function names: seed_users, seed_diary, seed_goals, seed_activity, main, or seed"
+                "Expected function names: seed_users, seed_diary, seed_goals, seed_kbits, seed_knowledge_graphs, seed_activity, main, or seed"
             )
             return False
         

@@ -7,16 +7,28 @@ falls back to its registered default (see ``pipeline``).
 from pydantic import BaseModel
 
 
+class StrategyWeights(BaseModel):
+    """Per-stage strategy weights sent from the client (0–100 scale ok)."""
+
+    query: dict[str, float] | None = None
+    generator: dict[str, float] | None = None
+    screen: dict[str, float] | None = None
+    rank: dict[str, float] | None = None
+
+
 class InvokeBody(BaseModel):
     """Body for ``POST /kbits/invoke``.
 
     ``goal_id`` optionally focuses generation on a single goal. The four
     ``*_strategy`` fields select the algorithm for each pipeline stage; leave
-    them unset to use the stage default.
+    them unset to use weighted random from ``strategy_weights``. ``graph_weights``
+    maps graph id → weight for graph query strategies to pick a graph internally.
     """
 
     goal_id: str | None = None
     count: int | None = None
+    strategy_weights: StrategyWeights | None = None
+    graph_weights: dict[str, float] | None = None
     query_strategy: str | None = None
     generator_strategy: str | None = None
     screen_strategy: str | None = None

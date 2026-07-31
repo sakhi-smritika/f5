@@ -2,9 +2,6 @@
 
 The query stage decides *what kind* of bits the user needs; a generator produces
 them. ``LLMGenerator`` (the default) asks a LiteLLM-backed model.
-``WebSearchGenerator`` is a registered stub kept behind the same contract so a
-web-grounded generator can drop in later without touching the orchestrator or
-endpoints.
 """
 
 from __future__ import annotations
@@ -14,7 +11,7 @@ import logging
 
 import litellm
 
-from config.llm_keys import get_api_key_for_model
+from config.llm_keys import get_litellm_kwargs
 from config.models import get_default_model_id
 
 from .base import GeneratorStrategy, KBCandidate, Query, Registry
@@ -39,10 +36,35 @@ _SYSTEM_PROMPT = (
 )
 
 
+def _generator_query_text(query: Query) -> str:
+    """Flatten the query for the generator without listing titles to copy."""
+    parts: list[str] = []
+    if query.include:
+        parts.append("Focus on: " + "; ".join(query.include))
+    if query.exclude:
+        parts.append(
+            f"The user already has {len(query.exclude)} related bits. "
+            "Do not reuse or lightly rephrase any existing title — invent fresh angles."
+        )
+    if query.brief:
+        parts.append("What this user needs now:\n" + query.brief)
+    return "\n".join(parts)
+
+
 def build_generator_user_message(query: Query, limit: int) -> str:
     """Build the user message sent to the LLM generator for one invoke run."""
-    query_text = query.to_text() or _FALLBACK_FOCUS
-    return f"Generate {limit} knowledge bits.\n\n{query_text}"
+    query_text = _generator_query_text(query) or _FALLBACK_FOCUS
+    parts = [f"Generate {limit} knowledge bits.", "", query_text]
+    if query.rejected_titles:
+        parts.extend(
+            [
+                "",
+                "Your previous titles were rejected because they duplicate existing bits.",
+                "Use fresh angles and different titles. Rejected titles:",
+                *[f"- {title}" for title in query.rejected_titles[:20]],
+            ]
+        )
+    return "\n".join(parts)
 
 
 def _parse_bits(raw: str, limit: int) -> list[KBCandidate]:
@@ -57,7 +79,11 @@ def _parse_bits(raw: str, limit: int) -> list[KBCandidate]:
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
-        logger.warning("LLMGenerator returned non-JSON content; skipping")
+        preview = text[:240].replace("\n", "\\n")
+        logger.warning(
+            "LLMGenerator returned non-JSON content; skipping",
+            extra={"response_preview": preview},
+        )
         return []
 
     if not isinstance(data, list):
@@ -82,14 +108,12 @@ class LLMGenerator:
 
     async def generate(self, query: Query, limit: int) -> list[KBCandidate]:
         user_message = build_generator_user_message(query, limit)
-        model_id = get_default_model_id()
         response = await litellm.acompletion(
-            model=model_id,
-            api_key=get_api_key_for_model(model_id),
             messages=[
                 {"role": "system", "content": _SYSTEM_PROMPT},
                 {"role": "user", "content": user_message},
             ],
+            **get_litellm_kwargs(get_default_model_id()),
         )
         content = (
             response.choices[0].message.content
@@ -97,17 +121,3 @@ class LLMGenerator:
             else ""
         )
         return _parse_bits(content, limit)
-
-
-@GENERATOR_STRATEGIES.register("web_search")
-class WebSearchGenerator:
-    """Placeholder for a future web-search-grounded generator.
-
-    Registered so it appears in ``GET /kbits/strategies`` and documents the
-    intended extension point. Wire a search API + summarizer here later.
-    """
-
-    async def generate(self, query: Query, limit: int) -> list[KBCandidate]:
-        raise NotImplementedError(
-            "web_search generator is not implemented yet; use 'llm'."
-        )

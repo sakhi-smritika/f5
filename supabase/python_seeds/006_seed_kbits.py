@@ -3,14 +3,14 @@ Seed knowledge bits into public.knowledge_bits, plus optional discussion threads
 
 Each bit is keyed by user email + title for idempotency. ``goal_name`` optionally
 links a bit to a seeded goal (resolved to ``related_goal``); run 004_seed_goals
-first when using it. Interaction flags fall back to the table defaults.
+first when using it. ``graph_link`` resolves graph and node UUIDs from
+005_seed_knowledge_graphs and writes full ``metadata`` plus ``knowledge_bit_nodes``
+rows.
 
 When a bit carries a ``comments`` list, we also seed a discussion thread for it,
 mirroring 002_seed_conversations: a ``conversations`` row linked to the bit via
 ``kbit_id`` plus an ADK session, then the LlmAgent + Runner replays each user
-comment so the agent persists both the comment and its reply. The bit itself is
-injected into the agent's instruction (never stored as a message), matching the
-runtime behaviour in ``agent.chat_agent``.
+comment so the agent persists both the comment and its reply.
 
 The discussion flow only runs when at least one bit has comments, so seeding
 bits without comments needs neither ``OPENAI_API_KEY`` nor ``DATABASE_URL``.
@@ -35,7 +35,6 @@ from .utils import get_admin_client, resolve_user_ids_by_emails
 
 logger = logging.getLogger(__name__)
 
-# Interaction flags copied straight through when present in a seed entry.
 INTERACTION_FIELDS = (
     "is_read",
     "is_viewed",
@@ -50,7 +49,6 @@ INTERACTION_FIELDS = (
 def resolve_goal_id(
     supabase: Any, *, user_id: str, goal_name: str
 ) -> str | None:
-    """Return the id of a user's goal by name, or None if it doesn't exist."""
     response = (
         supabase.table("goals")
         .select("id")
@@ -63,12 +61,148 @@ def resolve_goal_id(
     return str(rows[0]["id"]) if rows else None
 
 
+def load_graph_registry(
+    supabase: Any, user_ids_by_email: dict[str, str]
+) -> dict[tuple[str, str], dict]:
+    """Map (email, graph_title) -> {id, title, nodes: {label: node_id}}."""
+    registry: dict[tuple[str, str], dict] = {}
+    for email, user_id in user_ids_by_email.items():
+        graphs = (
+            supabase.table("knowledge_graphs")
+            .select("id, title")
+            .eq("user_id", user_id)
+            .execute()
+        )
+        for graph in getattr(graphs, "data", None) or []:
+            graph_id = str(graph["id"])
+            title = graph["title"]
+            nodes = (
+                supabase.table("knowledge_nodes")
+                .select("id, label, kbit_count")
+                .eq("graph_id", graph_id)
+                .execute()
+            )
+            node_map = {
+                row["label"]: str(row["id"])
+                for row in (getattr(nodes, "data", None) or [])
+            }
+            registry[(email, title)] = {
+                "id": graph_id,
+                "title": title,
+                "nodes": node_map,
+            }
+    return registry
+
+
+def resolve_metadata(
+    entry: dict,
+    *,
+    email: str,
+    registry: dict[tuple[str, str], dict],
+) -> dict | None:
+    """Merge seed metadata with resolved graph and expansion node ids."""
+    base = dict(entry.get("metadata") or {})
+    graph_link = entry.get("graph_link")
+    if not graph_link:
+        return base or None
+
+    graph_title = graph_link["graph_title"]
+    graph = registry.get((email, graph_title))
+    if not graph:
+        logger.warning(
+            "Graph '%s' not found for %s; metadata will omit graph fields. "
+            "Run 005_seed_knowledge_graphs first.",
+            graph_title,
+            email,
+        )
+        return base or None
+
+    expansion_label = graph_link["expansion_node_label"]
+    expansion_id = graph["nodes"].get(expansion_label)
+    if not expansion_id:
+        logger.warning(
+            "Node '%s' not found in graph '%s' for %s",
+            expansion_label,
+            graph_title,
+            email,
+        )
+        return base or None
+
+    base["graph"] = {"id": graph["id"], "title": graph["title"]}
+    base["expansion_node"] = {"id": expansion_id, "label": expansion_label}
+    return base
+
+
+def resolve_node_ids(
+    entry: dict,
+    *,
+    email: str,
+    registry: dict[tuple[str, str], dict],
+) -> list[str]:
+    graph_link = entry.get("graph_link")
+    if not graph_link:
+        return []
+
+    graph = registry.get((email, graph_link["graph_title"]))
+    if not graph:
+        return []
+
+    ids: list[str] = []
+    for label in graph_link.get("node_labels") or []:
+        node_id = graph["nodes"].get(label)
+        if node_id:
+            ids.append(node_id)
+        else:
+            logger.warning(
+                "Node '%s' not found in graph '%s' for %s",
+                label,
+                graph_link["graph_title"],
+                email,
+            )
+    return ids
+
+
+def link_bit_to_nodes(
+    supabase: Any, *, kbit_id: str, node_ids: list[str]
+) -> None:
+    for node_id in node_ids:
+        existing = (
+            supabase.table("knowledge_bit_nodes")
+            .select("kbit_id")
+            .eq("kbit_id", kbit_id)
+            .eq("node_id", node_id)
+            .limit(1)
+            .execute()
+        )
+        rows = getattr(existing, "data", None) or []
+        if rows:
+            continue
+        supabase.table("knowledge_bit_nodes").insert(
+            {"kbit_id": kbit_id, "node_id": node_id}
+        ).execute()
+
+
+def mark_expansion_node(supabase: Any, node_id: str) -> None:
+    response = (
+        supabase.table("knowledge_nodes")
+        .select("kbit_count")
+        .eq("id", node_id)
+        .limit(1)
+        .execute()
+    )
+    rows = getattr(response, "data", None) or []
+    current = int(rows[0].get("kbit_count") or 0) if rows else 0
+    supabase.table("knowledge_nodes").update(
+        {"kbit_count": current + 1}
+    ).eq("id", node_id).execute()
+
+
 def find_existing_kbit(
     supabase: Any, *, user_id: str, title: str
 ) -> dict | None:
     response = (
         supabase.table("knowledge_bits")
-        .select("id, generator_prompt")
+        .select("id, generator_prompt, metadata")
         .eq("user_id", user_id)
         .eq("title", title)
         .limit(1)
@@ -79,7 +213,11 @@ def find_existing_kbit(
 
 
 def build_kbit_row(
-    user_id: str, entry: dict, *, related_goal: str | None
+    user_id: str,
+    entry: dict,
+    *,
+    related_goal: str | None,
+    metadata: dict | None,
 ) -> dict:
     row = {
         "user_id": user_id,
@@ -92,10 +230,36 @@ def build_kbit_row(
             row[field] = entry[field]
     if "generator_prompt" in entry:
         row["generator_prompt"] = entry["generator_prompt"]
+    if metadata:
+        row["metadata"] = metadata
     return row
 
 
-# --- Discussion (comment thread) seeding via the ADK runner -----------------
+def apply_graph_links(
+    supabase: Any,
+    *,
+    kbit_id: str,
+    entry: dict,
+    email: str,
+    registry: dict[tuple[str, str], dict],
+    bump_expansion: bool = False,
+) -> None:
+    node_ids = resolve_node_ids(entry, email=email, registry=registry)
+    if not node_ids:
+        return
+    link_bit_to_nodes(supabase, kbit_id=kbit_id, node_ids=node_ids)
+    if not bump_expansion:
+        return
+    graph_link = entry["graph_link"]
+    graph = registry.get((email, graph_link["graph_title"]))
+    if not graph:
+        return
+    expansion_id = graph["nodes"].get(graph_link["expansion_node_label"])
+    if expansion_id:
+        mark_expansion_node(supabase, expansion_id)
+
+
+# --- Discussion seeding -----------------------------------------------------
 
 
 def get_openai_api_key() -> str:
@@ -115,11 +279,6 @@ def get_session_service() -> DatabaseSessionService:
 
 
 def build_kbit_agent(api_key: str, *, title: str, content: str) -> LlmAgent:
-    """Build an agent whose instruction embeds the bit under discussion.
-
-    This mirrors the discussion framing that ``agent.chat_agent`` injects at runtime,
-    so seeded replies read the same as live ones.
-    """
     instruction = (
         "You are Smritika, discussing one specific Knowledge Bit with the user in "
         "a threaded comment section. The bit below is the subject of this "
@@ -152,7 +311,6 @@ def discussion_exists(supabase: Any, *, kbit_id: str) -> bool:
 def create_discussion(
     supabase: Any, *, user_id: str, kbit_id: str, title: str
 ) -> str:
-    """Create a discussion conversation row linked to a bit."""
     conversation_id = str(uuid.uuid4())
     supabase.table("conversations").insert(
         {
@@ -166,7 +324,6 @@ def create_discussion(
 
 
 async def seed_discussions(discussions: list[dict]) -> None:
-    """Replay each bit's comments through the agent runner (idempotent by kbit)."""
     supabase = get_admin_client()
     api_key = get_openai_api_key()
     session_service = get_session_service()
@@ -213,9 +370,6 @@ async def seed_discussions(discussions: list[dict]) -> None:
         )
 
 
-# --- Entry point ------------------------------------------------------------
-
-
 def seed_kbits() -> None:
     """Seed knowledge bits (idempotent by user + title) and their discussions."""
     supabase = get_admin_client()
@@ -229,16 +383,16 @@ def seed_kbits() -> None:
             + ", ".join(missing)
         )
 
+    graph_registry = load_graph_registry(supabase, user_ids_by_email)
     logger.info("Seeding %s knowledge bit(s)...", len(SEED_KBITS))
 
-    # Discussions are collected and seeded after all bits exist, so the agent
-    # runner is only spun up once (and only when there are comments to seed).
     discussions: list[dict] = []
 
     for entry in SEED_KBITS:
         email = entry["email"]
         user_id = user_ids_by_email[email]
         title = entry["title"]
+        metadata = resolve_metadata(entry, email=email, registry=graph_registry)
 
         existing = find_existing_kbit(supabase, user_id=user_id, title=title)
         if existing:
@@ -250,6 +404,19 @@ def seed_kbits() -> None:
                     {"generator_prompt": prompt}
                 ).eq("id", kbit_id).execute()
                 logger.info("  ↻ Backfilled generator_prompt for: %s", title)
+            if metadata and not existing.get("metadata"):
+                supabase.table("knowledge_bits").update(
+                    {"metadata": metadata}
+                ).eq("id", kbit_id).execute()
+                logger.info("  ↻ Backfilled metadata for: %s", title)
+            if entry.get("graph_link"):
+                apply_graph_links(
+                    supabase,
+                    kbit_id=kbit_id,
+                    entry=entry,
+                    email=email,
+                    registry=graph_registry,
+                )
         else:
             related_goal = None
             goal_name = entry.get("goal_name")
@@ -266,7 +433,9 @@ def seed_kbits() -> None:
                         title,
                     )
 
-            row = build_kbit_row(user_id, entry, related_goal=related_goal)
+            row = build_kbit_row(
+                user_id, entry, related_goal=related_goal, metadata=metadata
+            )
             response = supabase.table("knowledge_bits").insert(row).execute()
             rows = getattr(response, "data", None) or []
             if not rows:
@@ -275,6 +444,15 @@ def seed_kbits() -> None:
                 )
             kbit_id = str(rows[0]["id"])
             logger.info("✓ Seeded knowledge bit for %s: %s", email, title)
+            if entry.get("graph_link"):
+                apply_graph_links(
+                    supabase,
+                    kbit_id=kbit_id,
+                    entry=entry,
+                    email=email,
+                    registry=graph_registry,
+                    bump_expansion=True,
+                )
 
         comments = entry.get("comments")
         if comments:

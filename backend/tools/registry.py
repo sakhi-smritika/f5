@@ -43,6 +43,13 @@ from .kbits_tools.kbits_tools import (
     search_kbits,
     update_kbit,
 )
+from .graph_tools.graph_tools import (
+    get_knowledge_graph,
+    get_node_neighbors,
+    list_graph_nodes,
+    list_my_knowledge_graphs,
+    list_node_kbits,
+)
 from .web_search_tools.parallel_web_search import get_parallel_web_search_toolset
 
 _FUNCTION_TOOLS: list[FunctionTool] = [
@@ -101,4 +108,12 @@ KBIT_QUERY_TOOLS: list[FunctionTool] = [
     # Google — what the user's upcoming time and to-dos look like
     FunctionTool(list_calendar_events),
     FunctionTool(list_tasks),
+]
+
+KBIT_GRAPH_QUERY_TOOLS: list[FunctionTool] = [
+    FunctionTool(list_my_knowledge_graphs),
+    FunctionTool(get_knowledge_graph),
+    FunctionTool(list_graph_nodes),
+    FunctionTool(get_node_neighbors),
+    FunctionTool(list_node_kbits),
 ]

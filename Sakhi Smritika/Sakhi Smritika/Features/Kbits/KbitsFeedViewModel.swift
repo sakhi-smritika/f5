@@ -9,13 +9,13 @@ final class KbitsFeedViewModel {
     var currentIndex: Int = 0
     var isLoading = true
     var isGenerating = false
+    var isRefreshing = false
     var loadError: String?
     var generateError: String?
 
     var discussionBit: KnowledgeBit?
 
     private var autoViewAttempted: Set<UUID> = []
-    private var invokeTriggeredForLastId: UUID?
     private let apiClient: APIClient
 
     init(apiClient: APIClient) {
@@ -25,7 +25,6 @@ final class KbitsFeedViewModel {
     func load() async {
         isLoading = true
         loadError = nil
-        invokeTriggeredForLastId = nil
         defer { isLoading = false }
 
         do {
@@ -33,13 +32,36 @@ final class KbitsFeedViewModel {
             async let mapTask = KbitService.discussionMap()
             bits = try await bitsTask
             discussedKbitIds = Set((try await mapTask).keys)
-            currentIndex = 0
-
-            if bits.isEmpty {
-                await invokeMore()
-            }
+            currentIndex = min(currentIndex, max(0, bits.count - 1))
         } catch {
             loadError = error.localizedDescription
+        }
+    }
+
+    /// Reload unviewed bits from Supabase, preserving in-memory edits for rows still in the feed.
+    func refresh() async {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        generateError = nil
+        defer { isRefreshing = false }
+
+        do {
+            async let bitsTask = KbitService.listKbits(unviewedOnly: true)
+            async let mapTask = KbitService.discussionMap()
+            let fetched = try await bitsTask
+            discussedKbitIds = Set((try await mapTask).keys)
+
+            let localById = Dictionary(uniqueKeysWithValues: bits.map { ($0.id, $0) })
+            bits = fetched
+                .sorted { $0.position < $1.position }
+                .map { localById[$0.id] ?? $0 }
+            currentIndex = min(currentIndex, max(0, bits.count - 1))
+
+            if bits.isEmpty {
+                generateError = "No unviewed bits for your account. Swiping past a card marks it viewed."
+            }
+        } catch {
+            generateError = error.localizedDescription
         }
     }
 
@@ -48,13 +70,9 @@ final class KbitsFeedViewModel {
             markViewed(bitAt: currentIndex)
         }
         currentIndex = index
-
-        if index == bits.count - 1 {
-            Task { await loadMoreIfNeeded(triggerBitId: bit.id) }
-        }
     }
 
-    func onLoadingCardVisible() {
+    func onActionCardVisible() {
         markViewed(bitAt: currentIndex)
         currentIndex = bits.count
     }
@@ -73,32 +91,40 @@ final class KbitsFeedViewModel {
         }
     }
 
-    func loadMoreIfNeeded(triggerBitId: UUID) async {
+    /// Start generation on the backend. Completes in the background; use Refresh if the request times out.
+    func invokeMore() {
         guard !isGenerating else { return }
-        guard invokeTriggeredForLastId != triggerBitId else { return }
-        invokeTriggeredForLastId = triggerBitId
-        await invokeMore()
+        Task { await runInvoke() }
     }
 
-    func invokeMore() async {
+    private func runInvoke() async {
         isGenerating = true
         generateError = nil
         defer { isGenerating = false }
 
         do {
+            let preferences = StrategyPreferencesStore.shared
+            async let catalogTask = KbitService.strategies(api: apiClient)
+            async let graphsTask = KnowledgeGraphService.listGraphs()
+            let catalog = try await catalogTask
+            let graphs = try await graphsTask
+
             let created = try await KbitService.invoke(
                 api: apiClient,
-                body: InvokeKbitsBody(count: 5)
+                body: InvokeKbitsBody(
+                    count: 5,
+                    strategyWeights: preferences.strategyWeightsPayload(catalog: catalog),
+                    graphWeights: preferences.graphWeightsPayload(graphs: graphs)
+                )
             )
             if created.isEmpty {
                 generateError = "No new bits were generated."
-                invokeTriggeredForLastId = nil
             } else {
                 appendNewBits(created)
+                generateError = nil
             }
         } catch {
-            generateError = error.localizedDescription
-            invokeTriggeredForLastId = nil
+            generateError = "\(error.localizedDescription) Tap Refresh to check for new bits."
         }
     }
 
@@ -186,15 +212,9 @@ final class KbitsFeedViewModel {
         if currentIndex >= bits.count {
             currentIndex = max(0, bits.count - 1)
         }
-        invokeTriggeredForLastId = nil
         Task {
             do {
                 try await KbitService.delete(api: apiClient, id: bit.id)
-                if bits.isEmpty {
-                    await invokeMore()
-                } else if currentIndex >= bits.count - 1, let last = bits.last {
-                    await loadMoreIfNeeded(triggerBitId: last.id)
-                }
             } catch {
                 bits = previous
                 generateError = error.localizedDescription

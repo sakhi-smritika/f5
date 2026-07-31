@@ -13,7 +13,15 @@ from __future__ import annotations
 
 import logging
 
+from agent.kbit_graph_query_agent import build_kbit_graph_query
 from agent.kbit_query_agent import build_kbit_query
+from knowledge_graph import (
+    list_user_graphs,
+    load_graph_snapshot,
+    pick_graph,
+    pick_node_by_potential,
+)
+from knowledge_graph.query_builder import build_graph_query
 
 from .base import PipelineContext, Query, QueryStrategy, Registry
 
@@ -110,4 +118,76 @@ class AgentQuery:
             include=submitted["include"],
             exclude=_merge_exclusions(submitted["exclude"], ctx.existing_titles),
             brief=submitted["brief"],
+        )
+
+
+def _pick_graph_for_ctx(ctx: PipelineContext):
+    """Weighted-random graph pick shared by graph query strategies."""
+    graphs = list_user_graphs(ctx.user_id)
+    picked = pick_graph(ctx.graph_weights, graphs)
+    if picked is None:
+        return None
+    snapshot = load_graph_snapshot(picked["id"], ctx.user_id)
+    if snapshot is None or not snapshot.nodes:
+        return None
+    return picked, snapshot
+
+
+@QUERY_STRATEGIES.register("graph_potential")
+class GraphPotentialQuery:
+    """Pick a graph by weight, score nodes, and expand the highest-potential one."""
+
+    async def build(self, ctx: PipelineContext) -> Query:
+        result = _pick_graph_for_ctx(ctx)
+        if result is None:
+            logger.warning("graph_potential unavailable; falling back to goals_profile")
+            return await GoalsProfileQuery().build(ctx)
+
+        _graph, snapshot = result
+        node = pick_node_by_potential(snapshot)
+        if node is None:
+            return await GoalsProfileQuery().build(ctx)
+        return build_graph_query(snapshot, node, ctx)
+
+
+@QUERY_STRATEGIES.register("graph_agent")
+class GraphAgentQuery:
+    """Pick a graph by weight, then let an agent choose the expansion node."""
+
+    async def build(self, ctx: PipelineContext) -> Query:
+        result = _pick_graph_for_ctx(ctx)
+        if result is None:
+            logger.warning("graph_agent unavailable; falling back to goals_profile")
+            return await GoalsProfileQuery().build(ctx)
+
+        graph, snapshot = result
+        submitted = await build_kbit_graph_query(graph["id"], ctx.count)
+        if submitted is None:
+            node = pick_node_by_potential(snapshot)
+            if node is None:
+                return await GoalsProfileQuery().build(ctx)
+            return build_graph_query(snapshot, node, ctx)
+
+        expansion_node_id = str(submitted.get("expansion_node_id") or "").strip()
+        if snapshot.node_by_id(expansion_node_id) is None:
+            logger.warning(
+                "Graph agent returned unknown expansion node; falling back to potential pick",
+                extra={
+                    "graph_id": graph["id"],
+                    "expansion_node_id": expansion_node_id,
+                },
+            )
+            node = pick_node_by_potential(snapshot)
+            if node is None:
+                return await GoalsProfileQuery().build(ctx)
+            return build_graph_query(snapshot, node, ctx)
+
+        ctx.selected_graph_id = graph["id"]
+        ctx.selected_node_id = expansion_node_id
+        return Query(
+            include=submitted["include"],
+            exclude=_merge_exclusions(submitted["exclude"], ctx.existing_titles),
+            brief=submitted["brief"],
+            graph_id=graph["id"],
+            expansion_node_id=expansion_node_id,
         )

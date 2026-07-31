@@ -22,7 +22,7 @@ from tools.context import (
     current_now_label,
 )
 from tools.registry import ALL_TOOLS
-from config.llm_keys import get_api_key_for_model
+from config.llm_keys import get_litellm_kwargs
 from config.models import get_default_model_id
 
 # ADK groups sessions/state under an app name. Keep this stable so previously
@@ -124,10 +124,7 @@ def build_chat_agent(model_id: str | None = None) -> LlmAgent:
     """
     resolved_model = model_id or get_default_model_id()
     return LlmAgent(
-        model=LiteLlm(
-            model=resolved_model,
-            api_key=get_api_key_for_model(resolved_model),
-        ),
+        model=LiteLlm(**get_litellm_kwargs(resolved_model)),
         name="assistant",
         instruction=_instruction_provider,
         tools=list(ALL_TOOLS),

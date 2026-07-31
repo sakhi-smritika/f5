@@ -30,7 +30,7 @@ from google.genai import types
 
 from tools.context import require_user_id
 from tools.registry import KBIT_QUERY_TOOLS
-from config.llm_keys import get_api_key_for_model
+from config.llm_keys import get_litellm_kwargs
 from config.models import get_default_model_id
 
 logger = logging.getLogger(__name__)
@@ -104,10 +104,7 @@ def build_kbit_query_agent(model_id: str | None = None) -> LlmAgent:
     """Create the query-building agent: read-only tools plus the submit tool."""
     resolved_model = model_id or get_default_model_id()
     return LlmAgent(
-        model=LiteLlm(
-            model=resolved_model,
-            api_key=get_api_key_for_model(resolved_model),
-        ),
+        model=LiteLlm(**get_litellm_kwargs(resolved_model)),
         name="kbit_query_builder",
         instruction=INSTRUCTION,
         tools=[*KBIT_QUERY_TOOLS, FunctionTool(submit_kbit_query)],

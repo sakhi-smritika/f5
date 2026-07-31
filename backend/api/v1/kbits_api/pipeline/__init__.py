@@ -12,7 +12,7 @@ Use :func:`invoke_kbits` to run all four and persist the result.
 
 from .base import KBCandidate, PipelineContext, Query, Registry
 from .generators import GENERATOR_STRATEGIES
-from .orchestrator import build_context, invoke_kbits
+from .orchestrator import build_context, invoke_kbits, resolve_strategies
 from .query import QUERY_STRATEGIES
 from .ranker import RANK_STRATEGIES
 from .screener import SCREEN_STRATEGIES
@@ -36,4 +36,5 @@ __all__ = [
     "STRATEGY_REGISTRIES",
     "build_context",
     "invoke_kbits",
+    "resolve_strategies",
 ]

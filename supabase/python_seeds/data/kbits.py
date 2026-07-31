@@ -7,9 +7,13 @@ omit it for goalless bits. Interaction flags default to unset when absent.
 ``generator_prompt`` is the user message sent to the LLM generator when the bit
 was created (same shape as ``build_generator_user_message`` in the pipeline).
 
+``metadata`` holds pipeline provenance (strategy names, optional ``new_concepts``).
+When ``graph_link`` is set, 006_seed_kbits resolves graph and node UUIDs from
+005_seed_knowledge_graphs and fills ``metadata.graph`` / ``metadata.expansion_node``.
+
 ``comments`` optionally seeds a discussion thread on the bit: each string is a
 user comment, and the agent generates a reply after each one (see
-005_seed_kbits). The bit itself is the subject of the thread and is never stored
+006_seed_kbits). The bit itself is the subject of the thread and is never stored
 as a message.
 """
 
@@ -33,6 +37,12 @@ SEED_KBITS = [
             "They keep failing to start their morning routine and want practical "
             "ways to make the first step feel small enough to actually do."
         ),
+        "metadata": {
+            "query_strategy": "agent",
+            "generator_strategy": "llm",
+            "screen_strategy": "text",
+            "rank_strategy": "text",
+        },
         "is_read": True,
         "is_liked": True,
         "comments": [
@@ -59,6 +69,12 @@ SEED_KBITS = [
             "They journal regularly but mostly log events. They want bits that help "
             "turn writing into a thinking practice."
         ),
+        "metadata": {
+            "query_strategy": "goals_profile",
+            "generator_strategy": "llm",
+            "screen_strategy": "text",
+            "rank_strategy": "text",
+        },
         "is_read": True,
         "is_marked_relavant": True,
         "rating": 5,
@@ -84,6 +100,12 @@ SEED_KBITS = [
             "Their phone is the biggest blocker to focused work. They need concrete "
             "environment and ritual changes, not generic productivity advice."
         ),
+        "metadata": {
+            "query_strategy": "single_goal",
+            "generator_strategy": "llm",
+            "screen_strategy": "text",
+            "rank_strategy": "text",
+        },
         "is_read": False,
         "comments": [
             "My phone is my biggest distraction. Any tip beyond just putting it away?",
@@ -107,6 +129,12 @@ SEED_KBITS = [
             "They are building Sakhi Smritika and tend toward big batches. They need "
             "bits that reinforce shipping small slices and getting feedback quickly."
         ),
+        "metadata": {
+            "query_strategy": "goals_profile",
+            "generator_strategy": "llm",
+            "screen_strategy": "text",
+            "rank_strategy": "text",
+        },
         "is_liked": True,
     },
     {
@@ -125,7 +153,12 @@ SEED_KBITS = [
             "They often work late into the evening and treat sleep as optional. "
             "Goalless general well-being angle — no specific goal to anchor."
         ),
-        # goalless bit — general well-being
+        "metadata": {
+            "query_strategy": "goals_profile",
+            "generator_strategy": "llm",
+            "screen_strategy": "text",
+            "rank_strategy": "text",
+        },
     },
     {
         "email": "seed_user@gmail.com",
@@ -144,6 +177,12 @@ SEED_KBITS = [
             "They are learning new material and default to cramming. They need "
             "evidence-based study habits that stick."
         ),
+        "metadata": {
+            "query_strategy": "goals_profile",
+            "generator_strategy": "llm",
+            "screen_strategy": "text",
+            "rank_strategy": "text",
+        },
         "is_read": True,
     },
     {
@@ -164,7 +203,44 @@ SEED_KBITS = [
             "They rely on motivation and lose streaks when willpower dips. "
             "Bits should emphasize designing defaults, not trying harder."
         ),
+        "metadata": {
+            "query_strategy": "agent",
+            "generator_strategy": "llm",
+            "screen_strategy": "text",
+            "rank_strategy": "text",
+        },
         "is_disliked": True,
+    },
+    {
+        "email": "seed_user@gmail.com",
+        "title": "ReAct: reason, then act in loops",
+        "content": (
+            "ReAct agents alternate short reasoning steps with tool calls. The model "
+            "writes what it intends to do, invokes a tool, reads the observation, and "
+            "repeats. This loop keeps plans grounded in real feedback instead of "
+            "hallucinating progress."
+        ),
+        "generator_prompt": (
+            "Generate 5 knowledge bits.\n\n"
+            "Focus on: ReAct pattern; tool use loops; observation-action cycles\n"
+            "Avoid repeating: Spaced repetition beats cramming\n"
+            "What this user needs right now:\n"
+            "Expand the ReAct pattern node in the Agentic AI knowledge graph."
+        ),
+        "graph_link": {
+            "graph_title": "Agentic AI systems",
+            "expansion_node_label": "ReAct pattern",
+            "node_labels": ["ReAct pattern", "Tool use loops"],
+        },
+        "metadata": {
+            "query_strategy": "graph_potential",
+            "generator_strategy": "llm",
+            "screen_strategy": "text",
+            "rank_strategy": "text",
+            "new_concepts": ["Tool use loops"],
+        },
+        "is_read": True,
+        "is_liked": True,
     },
     {
         "email": "seed_user@gmail.com",
@@ -183,6 +259,12 @@ SEED_KBITS = [
             "They have goals for Sakhi Smritika but progress feels vague. "
             "They need bits on tightening the loop between action and measurable signal."
         ),
+        "metadata": {
+            "query_strategy": "goals_profile",
+            "generator_strategy": "llm",
+            "screen_strategy": "text",
+            "rank_strategy": "text",
+        },
         "is_marked_relavant": True,
     },
     # test@example.com
@@ -203,6 +285,12 @@ SEED_KBITS = [
             "They are QA-ing the app and want to focus testing on real user paths "
             "instead of chasing coverage metrics."
         ),
+        "metadata": {
+            "query_strategy": "single_goal",
+            "generator_strategy": "llm",
+            "screen_strategy": "text",
+            "rank_strategy": "text",
+        },
         "is_read": True,
         "rating": 4,
     },
@@ -217,12 +305,23 @@ SEED_KBITS = [
         "goal_name": "QA core flows",
         "generator_prompt": (
             "Generate 5 knowledge bits.\n\n"
-            "Focus on: bug reproduction; debugging discipline; flaky tests\n"
+            "Focus on: Bug reproduction; debugging discipline; flaky tests\n"
             "Avoid repeating: Test the flow a user actually takes\n"
             "What this user needs right now:\n"
-            "They hit a flaky bug they cannot reproduce reliably. "
-            "Bits should stress systematic reproduction before fixing."
+            "Expand Bug reproduction in the Software testing knowledge graph."
         ),
+        "graph_link": {
+            "graph_title": "Software testing",
+            "expansion_node_label": "Bug reproduction",
+            "node_labels": ["Bug reproduction"],
+        },
+        "metadata": {
+            "query_strategy": "graph_potential",
+            "generator_strategy": "llm",
+            "screen_strategy": "text",
+            "rank_strategy": "text",
+            "new_concepts": [],
+        },
         "comments": [
             "I have a flaky bug I can't reproduce reliably. How should I start?",
             "Makes sense — I'll capture the exact steps and environment next time it fires.",
@@ -239,12 +338,23 @@ SEED_KBITS = [
         "goal_name": "Test diary save",
         "generator_prompt": (
             "Generate 5 knowledge bits.\n\n"
-            "Focus on: round-trip testing; serialization; diary save/load\n"
+            "Focus on: Round-trip testing; serialization; diary save/load\n"
             "Avoid repeating: Reproduce before you fix\n"
             "What this user needs right now:\n"
-            "They are testing diary persistence and need reminders to verify "
-            "write-read parity, not just that save appears to succeed."
+            "Expand from Bug reproduction toward round-trip parity checks."
         ),
+        "graph_link": {
+            "graph_title": "Software testing",
+            "expansion_node_label": "Bug reproduction",
+            "node_labels": ["Bug reproduction", "Round-trip testing"],
+        },
+        "metadata": {
+            "query_strategy": "graph_agent",
+            "generator_strategy": "llm",
+            "screen_strategy": "text",
+            "rank_strategy": "text",
+            "new_concepts": ["Round-trip testing"],
+        },
         "is_liked": True,
         "is_marked_relavant": True,
     },
@@ -263,6 +373,11 @@ SEED_KBITS = [
             "General personal-growth angle — help them channel restlessness into "
             "learning instead of passive scrolling. No specific goal."
         ),
-        # goalless bit
+        "metadata": {
+            "query_strategy": "goals_profile",
+            "generator_strategy": "llm",
+            "screen_strategy": "text",
+            "rank_strategy": "text",
+        },
     },
 ]

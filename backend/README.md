@@ -39,7 +39,8 @@ Copy `.env.example` to `.env`:
 | `OPENAI_API_KEY` | OpenAI key — used when a `CHAT_MODELS` entry starts with `openai/` |
 | `GEMINI_API_KEY` | Google Gemini key — used when a model starts with `gemini/` |
 | `ANTHROPIC_API_KEY` | Anthropic key — used when a model starts with `anthropic/` |
-| `CHAT_MODELS` | Comma-separated LiteLLM model list for the chat UI (`id\|Label` or `id` only); first entry is the default |
+| `OLLAMA_BASE_URL` | Ollama server URL for local models (default `http://localhost:11434`); synced to LiteLLM as `OLLAMA_API_BASE` |
+| `CHAT_MODELS` | Comma-separated LiteLLM model list for the chat UI (`id\|Label` or `id` only); first entry is the default. Use `ollama_chat/<model>` for Ollama. |
 | `DATABASE_URL` | Async SQLAlchemy URL for ADK session persistence, e.g. `postgresql+asyncpg://postgres:<pwd>@<host>:5432/postgres` (must use the `asyncpg` driver) |
 | `ENVIRONMENT` | `local` or `production` (controls CORS policy) |
 

@@ -1,5 +1,11 @@
 import SwiftUI
 
+private enum KbitCardPage: Hashable {
+    case content
+    case prompt
+    case metadata
+}
+
 struct KbitCardView: View {
     let bit: KnowledgeBit
     let hasDiscussion: Bool
@@ -18,6 +24,21 @@ struct KbitCardView: View {
         return !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    private var hasMetadataCard: Bool {
+        bit.metadata != nil
+    }
+
+    private var pages: [KbitCardPage] {
+        var result: [KbitCardPage] = [.content]
+        if hasPromptCard { result.append(.prompt) }
+        if hasMetadataCard { result.append(.metadata) }
+        return result
+    }
+
+    private var showsPageIndicator: Bool {
+        pages.count > 1
+    }
+
     var body: some View {
         GeometryReader { geo in
             cardContent(in: geo.size)
@@ -31,20 +52,17 @@ struct KbitCardView: View {
     private func cardContent(in size: CGSize) -> some View {
         ZStack(alignment: .bottom) {
             TabView(selection: $cardPage) {
-                knowledgeBitPage(in: size)
-                    .tag(0)
-
-                if hasPromptCard, let prompt = bit.generatorPrompt {
-                    promptPage(prompt, in: size)
-                        .tag(1)
+                ForEach(Array(pages.enumerated()), id: \.offset) { index, page in
+                    pageView(page, in: size)
+                        .tag(index)
                 }
             }
-            .tabViewStyle(.page(indexDisplayMode: hasPromptCard ? .automatic : .never))
+            .tabViewStyle(.page(indexDisplayMode: showsPageIndicator ? .automatic : .never))
             .id(bit.id)
 
             actionBar
                 .padding(.horizontal, 16)
-                .padding(.bottom, hasPromptCard ? 28 : 16)
+                .padding(.bottom, showsPageIndicator ? 28 : 16)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
@@ -56,6 +74,22 @@ struct KbitCardView: View {
                 .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
         }
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    @ViewBuilder
+    private func pageView(_ page: KbitCardPage, in size: CGSize) -> some View {
+        switch page {
+        case .content:
+            knowledgeBitPage(in: size)
+        case .prompt:
+            if let prompt = bit.generatorPrompt {
+                promptPage(prompt, in: size)
+            }
+        case .metadata:
+            if let metadata = bit.metadata {
+                metadataPage(metadata, in: size)
+            }
+        }
     }
 
     private func knowledgeBitPage(in size: CGSize) -> some View {
@@ -114,6 +148,82 @@ struct KbitCardView: View {
             .frame(minHeight: size.height - 20)
         }
         .scrollIndicators(.hidden)
+    }
+
+    private func metadataPage(_ metadata: KbitMetadata, in size: CGSize) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Generation metadata")
+                        .font(.title2.weight(.semibold))
+                    Text("How this bit was produced.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                metadataSection(title: "Strategies") {
+                    if let value = metadata.queryStrategy {
+                        metadataRow("Query", value)
+                    }
+                    if let value = metadata.generatorStrategy {
+                        metadataRow("Generator", value)
+                    }
+                    if let value = metadata.screenStrategy {
+                        metadataRow("Screen", value)
+                    }
+                    if let value = metadata.rankStrategy {
+                        metadataRow("Rank", value)
+                    }
+                }
+
+                if let graph = metadata.graph {
+                    metadataSection(title: "Knowledge graph") {
+                        metadataRow("Graph", graph.title ?? graph.id)
+                    }
+                }
+
+                if let node = metadata.expansionNode {
+                    metadataSection(title: "Expansion node") {
+                        metadataRow("Concept", node.label)
+                    }
+                }
+
+                if let concepts = metadata.newConcepts, !concepts.isEmpty {
+                    metadataSection(title: "New concepts") {
+                        ForEach(concepts, id: \.self) { concept in
+                            Text(concept)
+                                .font(.body)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }
+
+                Spacer(minLength: 88)
+            }
+            .padding(20)
+            .frame(minHeight: size.height - 20)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    private func metadataSection(title: String, @ViewBuilder content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.headline)
+            content()
+        }
+    }
+
+    private func metadataRow(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .top) {
+            Text(label)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 88, alignment: .leading)
+            Text(value)
+                .font(.body.monospaced())
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     private var actionBar: some View {

@@ -29,8 +29,6 @@ struct KbitsFeedView: View {
         }
     }
 
-    /// Shares the app-wide thread registry with the chat list, so a discussion
-    /// opened from either place is the same live conversation.
     private func discussionViewModel(for bit: KnowledgeBit) -> ChatThreadViewModel {
         dependencies.threadRegistry.viewModel(for: .kbit(bit.id)) {
             ChatThreadViewModel(
@@ -51,18 +49,12 @@ struct KbitsFeedView: View {
 
         ZStack {
             if vm.isLoading && vm.bits.isEmpty {
-                LoadingView(message: vm.isGenerating ? "Finding new bits…" : "Loading bits…")
-            } else if let loadError = vm.loadError, vm.bits.isEmpty, !vm.isGenerating {
+                LoadingView(message: "Loading bits…")
+            } else if let loadError = vm.loadError, vm.bits.isEmpty {
                 ContentUnavailableView(
                     "Couldn't load bits",
                     systemImage: "exclamationmark.triangle",
                     description: Text(loadError)
-                )
-            } else if vm.bits.isEmpty && !vm.isGenerating {
-                ContentUnavailableView(
-                    "No new bits right now",
-                    systemImage: "sparkles",
-                    description: Text("Pull down to refresh, or check back later.")
                 )
             } else {
                 GeometryReader { geo in
@@ -86,18 +78,21 @@ struct KbitsFeedView: View {
                                 .id(bit.id)
                             }
 
-                            if vm.isGenerating {
-                                KbitLoadingCardView()
-                                    .frame(width: geo.size.width, height: geo.size.height)
-                                    .id("loading")
-                                    .onAppear { vm.onLoadingCardVisible() }
-                            }
+                            KbitActionCardView(
+                                isGenerating: vm.isGenerating,
+                                isRefreshing: vm.isRefreshing,
+                                onInvoke: { vm.invokeMore() },
+                                onRefresh: { Task { await vm.refresh() } },
+                                onBecameVisible: { vm.onActionCardVisible() }
+                            )
+                            .frame(width: geo.size.width, height: geo.size.height)
+                            .id("action")
                         }
                         .scrollTargetLayout()
                     }
                     .scrollTargetBehavior(.paging)
                     .scrollIndicators(.hidden)
-                    .refreshable { await vm.load() }
+                    .refreshable { await vm.refresh() }
                 }
             }
 
@@ -113,19 +108,5 @@ struct KbitsFeedView: View {
                 }
             }
         }
-    }
-}
-
-private struct KbitLoadingCardView: View {
-    var body: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-            Text("Loading more bits…")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
     }
 }

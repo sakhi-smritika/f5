@@ -3,6 +3,8 @@ import SwiftUI
 enum MoreDestination: String, Identifiable {
     case profile
     case goals
+    case knowledgeGraphs
+    case strategies
     case settings
 
     var id: String { rawValue }
@@ -18,6 +20,8 @@ struct MoreView: View {
                 Section {
                     row(.profile, systemImage: "person.crop.circle", label: "Profile")
                     row(.goals, systemImage: "target", label: "Goals")
+                    row(.knowledgeGraphs, systemImage: "point.3.connected.trianglepath.dotted", label: "Knowledge Graphs")
+                    row(.strategies, systemImage: "slider.horizontal.3", label: "Strategies")
                     row(.settings, systemImage: "gearshape", label: "Settings")
                 }
 
@@ -34,6 +38,10 @@ struct MoreView: View {
                     ProfileView()
                 case .goals:
                     GoalsListView()
+                case .knowledgeGraphs:
+                    KnowledgeGraphsListView()
+                case .strategies:
+                    StrategiesView()
                 case .settings:
                     SettingsView()
                 }
