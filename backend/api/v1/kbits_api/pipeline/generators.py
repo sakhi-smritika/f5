@@ -39,6 +39,12 @@ _SYSTEM_PROMPT = (
 )
 
 
+def build_generator_user_message(query: Query, limit: int) -> str:
+    """Build the user message sent to the LLM generator for one invoke run."""
+    query_text = query.to_text() or _FALLBACK_FOCUS
+    return f"Generate {limit} knowledge bits.\n\n{query_text}"
+
+
 def _parse_bits(raw: str, limit: int) -> list[KBCandidate]:
     """Parse the model's response into candidates, tolerating stray fences."""
     text = raw.strip()
@@ -75,17 +81,14 @@ class LLMGenerator:
     """Default generator: ask a LiteLLM-backed model to write the bits."""
 
     async def generate(self, query: Query, limit: int) -> list[KBCandidate]:
-        query_text = query.to_text() or _FALLBACK_FOCUS
+        user_message = build_generator_user_message(query, limit)
         model_id = get_default_model_id()
         response = await litellm.acompletion(
             model=model_id,
             api_key=get_api_key_for_model(model_id),
             messages=[
                 {"role": "system", "content": _SYSTEM_PROMPT},
-                {
-                    "role": "user",
-                    "content": f"Generate {limit} knowledge bits.\n\n{query_text}",
-                },
+                {"role": "user", "content": user_message},
             ],
         )
         content = (

@@ -11,6 +11,13 @@ struct KbitCardView: View {
     let onDelete: () -> Void
     let onBecameVisible: () -> Void
 
+    @State private var cardPage = 0
+
+    private var hasPromptCard: Bool {
+        guard let prompt = bit.generatorPrompt else { return false }
+        return !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     var body: some View {
         GeometryReader { geo in
             cardContent(in: geo.size)
@@ -23,39 +30,21 @@ struct KbitCardView: View {
 
     private func cardContent(in size: CGSize) -> some View {
         ZStack(alignment: .bottom) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack {
-                        if !bit.isViewed {
-                            Text("NEW")
-                                .font(.caption2.weight(.bold))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.accentColor.opacity(0.2), in: Capsule())
-                        }
-                        Spacer()
-                    }
+            TabView(selection: $cardPage) {
+                knowledgeBitPage(in: size)
+                    .tag(0)
 
-                    Text(bit.title)
-                        .font(.title2.weight(.semibold))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    Text(bit.content)
-                        .font(.body)
-                        .foregroundStyle(.primary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .textSelection(.enabled)
-
-                    Spacer(minLength: 88)
+                if hasPromptCard, let prompt = bit.generatorPrompt {
+                    promptPage(prompt, in: size)
+                        .tag(1)
                 }
-                .padding(20)
-                .frame(minHeight: size.height - 20)
             }
-            .scrollIndicators(.hidden)
+            .tabViewStyle(.page(indexDisplayMode: hasPromptCard ? .automatic : .never))
+            .id(bit.id)
 
             actionBar
                 .padding(.horizontal, 16)
-                .padding(.bottom, 16)
+                .padding(.bottom, hasPromptCard ? 28 : 16)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
@@ -67,6 +56,64 @@ struct KbitCardView: View {
                 .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
         }
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    private func knowledgeBitPage(in size: CGSize) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    if !bit.isViewed {
+                        Text("NEW")
+                            .font(.caption2.weight(.bold))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.accentColor.opacity(0.2), in: Capsule())
+                    }
+                    Spacer()
+                }
+
+                Text(bit.title)
+                    .font(.title2.weight(.semibold))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Text(bit.content)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+
+                Spacer(minLength: 88)
+            }
+            .padding(20)
+            .frame(minHeight: size.height - 20)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    private func promptPage(_ prompt: String, in size: CGSize) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Generation prompt")
+                        .font(.title2.weight(.semibold))
+
+                    Text("The instruction sent to the AI when this bit was created.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                Text(prompt)
+                    .font(.body.monospaced())
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+
+                Spacer(minLength: 88)
+            }
+            .padding(20)
+            .frame(minHeight: size.height - 20)
+        }
+        .scrollIndicators(.hidden)
     }
 
     private var actionBar: some View {

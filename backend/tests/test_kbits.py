@@ -167,6 +167,7 @@ def test_invoke_llm_generator_inserts_parsed_bits(client, patch_kbits, monkeypat
     inserted = supabase.table("knowledge_bits").inserted
     assert inserted[0]["user_id"] == "test-user-id"
     assert inserted[0]["related_goal"] is None
+    assert inserted[0]["generator_prompt"].startswith("Generate 3 knowledge bits.")
 
 
 def test_invoke_sets_related_goal(client, patch_kbits, monkeypatch):

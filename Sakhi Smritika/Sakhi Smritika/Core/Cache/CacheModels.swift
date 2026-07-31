@@ -144,6 +144,7 @@ final class CachedKbit {
     var createdAt: String?
     var updatedAt: String?
     var relatedGoal: UUID?
+    var generatorPrompt: String?
     var position: Int
     var isRead: Bool
     var isViewed: Bool
@@ -160,6 +161,7 @@ final class CachedKbit {
         createdAt: String?,
         updatedAt: String?,
         relatedGoal: UUID?,
+        generatorPrompt: String? = nil,
         position: Int,
         isRead: Bool,
         isViewed: Bool,
@@ -175,6 +177,7 @@ final class CachedKbit {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.relatedGoal = relatedGoal
+        self.generatorPrompt = generatorPrompt
         self.position = position
         self.isRead = isRead
         self.isViewed = isViewed

@@ -7,6 +7,7 @@ struct KnowledgeBit: Codable, Identifiable, Hashable, Sendable {
     var title: String
     var content: String
     var relatedGoal: UUID?
+    var generatorPrompt: String?
     var position: Int
     var isRead: Bool
     var isViewed: Bool
@@ -25,6 +26,7 @@ struct KnowledgeBit: Codable, Identifiable, Hashable, Sendable {
         case title
         case content
         case relatedGoal = "related_goal"
+        case generatorPrompt = "generator_prompt"
         case position
         case isRead = "is_read"
         case isViewed = "is_viewed"

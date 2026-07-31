@@ -14,7 +14,7 @@ from tools.context import current_user_id
 from config.supabase import get_supabase_service_client
 
 from .base import KBCandidate, PipelineContext
-from .generators import GENERATOR_STRATEGIES
+from .generators import GENERATOR_STRATEGIES, build_generator_user_message
 from .query import QUERY_STRATEGIES
 from .ranker import RANK_STRATEGIES
 from .screener import SCREEN_STRATEGIES
@@ -94,6 +94,7 @@ async def invoke_kbits(
     token = current_user_id.set(user_id)
     try:
         query = await query_algo.build(ctx)
+        generator_prompt = build_generator_user_message(query, count)
         candidates = await generator_algo.generate(query, count)
     finally:
         current_user_id.reset(token)
@@ -106,11 +107,15 @@ async def invoke_kbits(
         logger.info("Invoke produced no bits", extra={"user_id": user_id})
         return []
 
-    return _persist(user_id, goal_id, candidates)
+    return _persist(user_id, goal_id, candidates, generator_prompt=generator_prompt)
 
 
 def _persist(
-    user_id: str, goal_id: str | None, candidates: list[KBCandidate]
+    user_id: str,
+    goal_id: str | None,
+    candidates: list[KBCandidate],
+    *,
+    generator_prompt: str | None = None,
 ) -> list[dict]:
     """Insert candidates as knowledge_bits rows and return the stored rows."""
     rows = [
@@ -120,6 +125,7 @@ def _persist(
             "title": candidate.title,
             "content": candidate.content,
             "related_goal": goal_id,
+            "generator_prompt": generator_prompt,
         }
         for candidate in candidates
     ]

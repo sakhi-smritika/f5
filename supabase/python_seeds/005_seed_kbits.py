@@ -63,19 +63,19 @@ def resolve_goal_id(
     return str(rows[0]["id"]) if rows else None
 
 
-def find_existing_kbit_id(
+def find_existing_kbit(
     supabase: Any, *, user_id: str, title: str
-) -> str | None:
+) -> dict | None:
     response = (
         supabase.table("knowledge_bits")
-        .select("id")
+        .select("id, generator_prompt")
         .eq("user_id", user_id)
         .eq("title", title)
         .limit(1)
         .execute()
     )
     rows = getattr(response, "data", None) or []
-    return str(rows[0]["id"]) if rows else None
+    return rows[0] if rows else None
 
 
 def build_kbit_row(
@@ -90,6 +90,8 @@ def build_kbit_row(
     for field in INTERACTION_FIELDS:
         if field in entry:
             row[field] = entry[field]
+    if "generator_prompt" in entry:
+        row["generator_prompt"] = entry["generator_prompt"]
     return row
 
 
@@ -238,9 +240,16 @@ def seed_kbits() -> None:
         user_id = user_ids_by_email[email]
         title = entry["title"]
 
-        kbit_id = find_existing_kbit_id(supabase, user_id=user_id, title=title)
-        if kbit_id:
+        existing = find_existing_kbit(supabase, user_id=user_id, title=title)
+        if existing:
+            kbit_id = str(existing["id"])
             logger.info("↺ Knowledge bit already exists for %s: %s", email, title)
+            prompt = entry.get("generator_prompt")
+            if prompt and not existing.get("generator_prompt"):
+                supabase.table("knowledge_bits").update(
+                    {"generator_prompt": prompt}
+                ).eq("id", kbit_id).execute()
+                logger.info("  ↻ Backfilled generator_prompt for: %s", title)
         else:
             related_goal = None
             goal_name = entry.get("goal_name")

@@ -15,7 +15,7 @@ from .constants import RECENT_TITLES_LIMIT
 KBIT_COLUMNS = (
     "id, created_at, updated_at, title, content, related_goal, position, "
     "is_read, is_viewed, is_liked, is_disliked, rating, "
-    "is_marked_relavant, is_marked_irrelavant"
+    "is_marked_relavant, is_marked_irrelavant, generator_prompt"
 )
 
 
