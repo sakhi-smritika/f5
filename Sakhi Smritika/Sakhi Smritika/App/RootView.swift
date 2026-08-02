@@ -8,23 +8,29 @@ struct RootView: View {
     /// not be built until the cache is confirmed to belong to this account.
     @State private var preparedUserId: UUID?
 
+    /// Covers both restoring the session and priming the cache, so startup is a
+    /// single uninterrupted splash rather than two separate loading states.
+    private var isPreparing: Bool {
+        if authService.isLoading { return true }
+        guard authService.isAuthenticated else { return false }
+        guard let userId = authService.userId else { return true }
+        return preparedUserId != userId
+    }
+
     var body: some View {
         Group {
-            if authService.isLoading {
-                LoadingView(message: "Preparing Sakhi…")
+            if isPreparing {
+                SplashView()
             } else if authService.isAuthenticated {
-                if let userId = authService.userId, preparedUserId == userId {
-                    MainTabView()
-                } else {
-                    LoadingView(message: "Preparing Sakhi…")
-                }
+                MainTabView()
             } else {
                 LoginView(viewModel: LoginViewModel(authService: authService))
             }
         }
+        .transition(.opacity)
         .dismissesKeyboardOnTapOutside()
+        .animation(.smooth(duration: 0.35), value: isPreparing)
         .animation(.smooth(duration: 0.35), value: authService.isAuthenticated)
-        .animation(.smooth(duration: 0.25), value: authService.isLoading)
         .task(id: authService.userId) {
             guard let userId = authService.userId else {
                 preparedUserId = nil
