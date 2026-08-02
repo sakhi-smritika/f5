@@ -78,6 +78,7 @@ struct KbitDiscussionSheet: View {
                     }
                     .padding(16)
                 }
+                .scrollDismissesKeyboard(.interactively)
                 .refreshable { await vm.reload() }
                 .onChange(of: vm.messages) { _, value in
                     if let last = value.last?.id {

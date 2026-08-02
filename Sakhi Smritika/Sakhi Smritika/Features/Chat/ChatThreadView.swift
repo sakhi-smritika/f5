@@ -38,14 +38,6 @@ struct ChatThreadView: View {
                     }
                 }
             }
-            .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") {
-                        composerFocused = false
-                    }
-                }
-            }
             .task {
                 viewModel.syncModels(
                     listViewModel.models,
@@ -155,9 +147,6 @@ struct ChatThreadView: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .refreshable { await vm.reload() }
-            .onTapGesture {
-                composerFocused = false
-            }
             .onChange(of: vm.messages) { _, messages in
                 if let last = messages.last?.id {
                     withAnimation(.easeOut(duration: 0.2)) {
@@ -238,17 +227,6 @@ struct ChatThreadView: View {
                     .focused($composerFocused)
                     .padding(12)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-
-                if composerFocused {
-                    Button {
-                        composerFocused = false
-                    } label: {
-                        Image(systemName: "keyboard.chevron.compact.down")
-                            .font(.title3)
-                            .frame(width: 36, height: 36)
-                    }
-                    .accessibilityLabel("Hide keyboard")
-                }
 
                 Button {
                     composerFocused = false

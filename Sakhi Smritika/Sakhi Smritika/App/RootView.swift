@@ -22,6 +22,7 @@ struct RootView: View {
                 LoginView(viewModel: LoginViewModel(authService: authService))
             }
         }
+        .dismissesKeyboardOnTapOutside()
         .animation(.smooth(duration: 0.35), value: authService.isAuthenticated)
         .animation(.smooth(duration: 0.25), value: authService.isLoading)
         .task(id: authService.userId) {
