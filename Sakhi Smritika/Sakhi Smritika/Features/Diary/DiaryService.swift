@@ -38,12 +38,14 @@ enum DiaryService {
     static func saveDayLog(
         date: String,
         dayLog: [String: String],
+        nutritionEntries: [NutritionEntry],
         userId: UUID
     ) async throws -> DiaryEntry {
         let payload = DiaryUpsert(
             date: date,
             userId: userId,
-            dayLog: dayLog
+            dayLog: dayLog,
+            nutritionEntries: nutritionEntries
         )
         return try await SupabaseManager.client
             .from("diary")

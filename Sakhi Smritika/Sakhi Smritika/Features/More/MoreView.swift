@@ -5,6 +5,8 @@ enum MoreDestination: String, Identifiable {
     case goals
     case knowledgeGraphs
     case strategies
+    case nutritionTemplates
+    case hourGroups
     case settings
 
     var id: String { rawValue }
@@ -22,6 +24,8 @@ struct MoreView: View {
                     row(.goals, systemImage: "target", label: "Goals")
                     row(.knowledgeGraphs, systemImage: "point.3.connected.trianglepath.dotted", label: "Knowledge Graphs")
                     row(.strategies, systemImage: "slider.horizontal.3", label: "Strategies")
+                    row(.nutritionTemplates, systemImage: "fork.knife", label: "Nutrition Templates")
+                    row(.hourGroups, systemImage: "clock.arrow.circlepath", label: "Hour Groups")
                     row(.settings, systemImage: "gearshape", label: "Settings")
                 }
 
@@ -42,6 +46,10 @@ struct MoreView: View {
                     KnowledgeGraphsListView()
                 case .strategies:
                     StrategiesView()
+                case .nutritionTemplates:
+                    NutritionTemplatesListView()
+                case .hourGroups:
+                    HourGroupSettingsView()
                 case .settings:
                     SettingsView()
                 }

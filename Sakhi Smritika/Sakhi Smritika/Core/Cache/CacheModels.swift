@@ -243,6 +243,7 @@ final class CachedDiaryEntry {
     var majorEvents: String?
     var generalContent: String?
     var dayLog: [String: String]?
+    var nutritionEntries: [NutritionEntry]?
     var createdAt: String?
     var updatedAt: String?
 
@@ -255,6 +256,7 @@ final class CachedDiaryEntry {
         majorEvents: String? = nil,
         generalContent: String? = nil,
         dayLog: [String: String]? = nil,
+        nutritionEntries: [NutritionEntry]? = nil,
         createdAt: String? = nil,
         updatedAt: String? = nil
     ) {
@@ -266,6 +268,7 @@ final class CachedDiaryEntry {
         self.majorEvents = majorEvents
         self.generalContent = generalContent
         self.dayLog = dayLog
+        self.nutritionEntries = nutritionEntries
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }

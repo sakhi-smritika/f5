@@ -504,6 +504,7 @@ final class CacheStore {
                 majorEvents: row.majorEvents,
                 generalContent: row.generalContent,
                 dayLog: row.dayLog,
+                nutritionEntries: row.nutritionEntries,
                 createdAt: row.createdAt,
                 updatedAt: row.updatedAt,
                 userId: userId
@@ -532,6 +533,7 @@ final class CacheStore {
                 row.majorEvents = nil
                 row.generalContent = nil
                 row.dayLog = nil
+                row.nutritionEntries = nil
                 return
             }
 
@@ -542,6 +544,7 @@ final class CacheStore {
             row.majorEvents = entry.majorEvents
             row.generalContent = entry.generalContent
             row.dayLog = entry.dayLog
+            row.nutritionEntries = entry.nutritionEntries
             row.createdAt = entry.createdAt
             row.updatedAt = entry.updatedAt
         }

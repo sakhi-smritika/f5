@@ -1,5 +1,15 @@
 import Foundation
 
+struct NutritionEntry: Codable, Hashable, Sendable {
+    var hour: Int
+    var food: String
+
+    enum CodingKeys: String, CodingKey {
+        case hour
+        case food
+    }
+}
+
 struct DiaryEntry: Codable, Identifiable, Hashable, Sendable {
     let id: UUID
     let date: String
@@ -7,6 +17,7 @@ struct DiaryEntry: Codable, Identifiable, Hashable, Sendable {
     var majorEvents: String?
     var generalContent: String?
     var dayLog: [String: String]?
+    var nutritionEntries: [NutritionEntry]?
     let createdAt: String?
     let updatedAt: String?
     let userId: UUID
@@ -18,6 +29,7 @@ struct DiaryEntry: Codable, Identifiable, Hashable, Sendable {
         case majorEvents = "major_events"
         case generalContent = "general_content"
         case dayLog = "day_log"
+        case nutritionEntries = "nutrition_entries"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
         case userId = "user_id"
@@ -31,6 +43,7 @@ struct DiaryUpsert: Encodable, Sendable {
     var majorEvents: String?
     var generalContent: String?
     var dayLog: [String: String]?
+    var nutritionEntries: [NutritionEntry]?
 
     enum CodingKeys: String, CodingKey {
         case date
@@ -39,6 +52,53 @@ struct DiaryUpsert: Encodable, Sendable {
         case majorEvents = "major_events"
         case generalContent = "general_content"
         case dayLog = "day_log"
+        case nutritionEntries = "nutrition_entries"
+    }
+}
+
+struct NutritionTemplate: Codable, Identifiable, Hashable, Sendable {
+    let id: UUID
+    let userId: UUID
+    var hour: Int
+    var nutrition: String
+    var isActive: Bool
+    let createdAt: String?
+    let updatedAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case hour
+        case nutrition
+        case isActive = "is_active"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+struct NutritionTemplateInsert: Encodable, Sendable {
+    let userId: UUID
+    let hour: Int
+    let nutrition: String
+    let isActive: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+        case hour
+        case nutrition
+        case isActive = "is_active"
+    }
+}
+
+struct NutritionTemplateUpdate: Encodable, Sendable {
+    let hour: Int
+    let nutrition: String
+    let isActive: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case hour
+        case nutrition
+        case isActive = "is_active"
     }
 }
 
