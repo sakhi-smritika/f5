@@ -3,7 +3,7 @@ Seed diary entries and hourly day logs into public.diary.
 
 Each seed row is keyed by user email + date. Rows may include:
 - diary fields: how_was_the_day, major_events, general_content
-- day_log: hourly map with keys "0" through "23"
+- day_log: hourly map with keys "0" through "23"; each hour is {done, impact}
 - both on the same date
 """
 

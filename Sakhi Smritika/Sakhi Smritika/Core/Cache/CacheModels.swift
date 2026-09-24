@@ -242,7 +242,7 @@ final class CachedDiaryEntry {
     var howWasTheDay: String?
     var majorEvents: String?
     var generalContent: String?
-    var dayLog: [String: String]?
+    var dayLog: [String: DayLogHourEntry]?
     var nutritionEntries: [NutritionEntry]?
     var createdAt: String?
     var updatedAt: String?
@@ -255,7 +255,7 @@ final class CachedDiaryEntry {
         howWasTheDay: String? = nil,
         majorEvents: String? = nil,
         generalContent: String? = nil,
-        dayLog: [String: String]? = nil,
+        dayLog: [String: DayLogHourEntry]? = nil,
         nutritionEntries: [NutritionEntry]? = nil,
         createdAt: String? = nil,
         updatedAt: String? = nil

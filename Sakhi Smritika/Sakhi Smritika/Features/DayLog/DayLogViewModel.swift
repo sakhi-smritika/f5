@@ -26,7 +26,7 @@ struct EditableNutritionEntry: Identifiable, Hashable {
 @Observable
 final class DayLogViewModel {
     var dateISO = DateHelpers.todayISODate()
-    var dayLog: [String: String]
+    var dayLog: [String: DayLogHourEntry]
     var nutritionEntries: [EditableNutritionEntry] = []
     var activeTemplates: [NutritionTemplate] = []
     var hourGroups = HourGroupPreferencesStore.shared.load()
@@ -67,8 +67,8 @@ final class DayLogViewModel {
         readFromCache()
     }
 
-    static func emptyLog() -> [String: String] {
-        Dictionary(uniqueKeysWithValues: hours.map { (String($0), "") })
+    static func emptyLog() -> [String: DayLogHourEntry] {
+        Dictionary(uniqueKeysWithValues: hours.map { (String($0), DayLogHourEntry()) })
     }
 
     static func hourLabel(_ hour: Int) -> String {
@@ -166,8 +166,17 @@ final class DayLogViewModel {
         }
     }
 
-    func setHour(_ hour: Int, value: String) {
-        dayLog[String(hour)] = value
+    func setDone(_ hour: Int, value: String) {
+        var entry = dayLog[String(hour)] ?? DayLogHourEntry()
+        entry.done = value
+        dayLog[String(hour)] = entry
+        markEdited()
+    }
+
+    func setImpact(_ hour: Int, value: String) {
+        var entry = dayLog[String(hour)] ?? DayLogHourEntry()
+        entry.impact = value
+        dayLog[String(hour)] = entry
         markEdited()
     }
 
@@ -220,7 +229,7 @@ final class DayLogViewModel {
         await persist(dayLog: dayLog, clearEditsOnSuccess: true)
     }
 
-    private func persist(dayLog dayLogToSave: [String: String], clearEditsOnSuccess: Bool) async {
+    private func persist(dayLog dayLogToSave: [String: DayLogHourEntry], clearEditsOnSuccess: Bool) async {
         guard let userId = authService.user?.id else {
             saveStatus = .error("You must be signed in to save.")
             return

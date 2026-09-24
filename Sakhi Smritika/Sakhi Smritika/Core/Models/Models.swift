@@ -10,13 +10,38 @@ struct NutritionEntry: Codable, Hashable, Sendable {
     }
 }
 
+/// One hour in `diary.day_log`. Keys are `"0"`...`"23"`.
+/// Legacy rows stored a single string; that text is read into `done`.
+struct DayLogHourEntry: Codable, Hashable, Sendable {
+    var done: String
+    var impact: String
+
+    init(done: String = "", impact: String = "") {
+        self.done = done
+        self.impact = impact
+    }
+
+    init(from decoder: Decoder) throws {
+        if let single = try? decoder.singleValueContainer(),
+           let text = try? single.decode(String.self) {
+            self.done = text
+            self.impact = ""
+            return
+        }
+
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.done = try container.decodeIfPresent(String.self, forKey: .done) ?? ""
+        self.impact = try container.decodeIfPresent(String.self, forKey: .impact) ?? ""
+    }
+}
+
 struct DiaryEntry: Codable, Identifiable, Hashable, Sendable {
     let id: UUID
     let date: String
     var howWasTheDay: String?
     var majorEvents: String?
     var generalContent: String?
-    var dayLog: [String: String]?
+    var dayLog: [String: DayLogHourEntry]?
     var nutritionEntries: [NutritionEntry]?
     let createdAt: String?
     let updatedAt: String?
@@ -42,7 +67,7 @@ struct DiaryUpsert: Encodable, Sendable {
     var howWasTheDay: String?
     var majorEvents: String?
     var generalContent: String?
-    var dayLog: [String: String]?
+    var dayLog: [String: DayLogHourEntry]?
     var nutritionEntries: [NutritionEntry]?
 
     enum CodingKeys: String, CodingKey {

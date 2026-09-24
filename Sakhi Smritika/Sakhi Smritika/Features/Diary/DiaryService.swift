@@ -37,7 +37,7 @@ enum DiaryService {
 
     static func saveDayLog(
         date: String,
-        dayLog: [String: String],
+        dayLog: [String: DayLogHourEntry],
         nutritionEntries: [NutritionEntry],
         userId: UUID
     ) async throws -> DiaryEntry {

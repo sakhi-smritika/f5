@@ -115,19 +115,31 @@ struct DayLogView: View {
     }
 
     private func hourRow(_ vm: DayLogViewModel, hour: Int) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(DayLogViewModel.hourLabel(hour))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
 
-            TextField(
-                "Notes…",
+            hourField(
+                placeholder: "What is done...",
                 text: Binding(
-                    get: { vm.dayLog[String(hour)] ?? "" },
-                    set: { vm.setHour(hour, value: $0) }
-                ),
-                axis: .vertical
+                    get: { vm.dayLog[String(hour)]?.done ?? "" },
+                    set: { vm.setDone(hour, value: $0) }
+                )
             )
+
+            hourField(
+                placeholder: "What was the Impact...",
+                text: Binding(
+                    get: { vm.dayLog[String(hour)]?.impact ?? "" },
+                    set: { vm.setImpact(hour, value: $0) }
+                )
+            )
+        }
+    }
+
+    private func hourField(placeholder: String, text: Binding<String>) -> some View {
+        TextField(placeholder, text: text, axis: .vertical)
             .lineLimit(1...4)
             .padding(14)
             .background(
@@ -138,7 +150,6 @@ struct DayLogView: View {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
             )
-        }
     }
 
     @ViewBuilder

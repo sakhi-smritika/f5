@@ -1,7 +1,8 @@
 """Seed data for diary entries and hourly day logs (public.diary)."""
 
 # Each row targets one user + date. Include diary fields, day_log, or both.
-# day_log keys are hour strings "0" through "23", matching the Day Log UI.
+# day_log keys are hour strings "0" through "23". Each hour is
+# {"done": "...", "impact": "..."}.
 
 SEED_DIARY_ENTRIES = [
     # Diary-only entry
@@ -31,14 +32,14 @@ SEED_DIARY_ENTRIES = [
         "email": "seed_user@gmail.com",
         "date": "2026-07-20",
         "day_log": {
-            "6": "Wake up, stretch, plan the day",
-            "7": "Breakfast and light reading",
-            "9": "Deep work on Sakhi Smritika",
-            "12": "Lunch break",
-            "14": "Code review and bug fixes",
-            "17": "Walk outside",
-            "20": "Diary writing and wind down",
-            "22": "Read before sleep",
+            "6": {"done": "Wake up, stretch, plan the day", "impact": "Started with a clear list"},
+            "7": {"done": "Breakfast and light reading", "impact": "Settled in before deep work"},
+            "9": {"done": "Deep work on Sakhi Smritika", "impact": "Moved the day log UI forward"},
+            "12": {"done": "Lunch break", "impact": "Reset energy for the afternoon"},
+            "14": {"done": "Code review and bug fixes", "impact": "Unblocked a couple of open PRs"},
+            "17": {"done": "Walk outside", "impact": "Cleared my head after sitting all day"},
+            "20": {"done": "Diary writing and wind down", "impact": "Captured the day before it faded"},
+            "22": {"done": "Read before sleep", "impact": "Slept easier"},
         },
     },
     # Combined diary + day log on the same date
@@ -52,12 +53,12 @@ SEED_DIARY_ENTRIES = [
             "organization turned out."
         ),
         "day_log": {
-            "8": "Standup and prioritization",
-            "10": "Frontend work on folders",
-            "13": "Lunch + short walk",
-            "15": "Backend endpoints for folder delete",
-            "18": "Manual testing in local Supabase",
-            "21": "Notes for tomorrow",
+            "8": {"done": "Standup and prioritization", "impact": "Locked the day's focus"},
+            "10": {"done": "Frontend work on folders", "impact": "Sidebar folders actually usable"},
+            "13": {"done": "Lunch + short walk", "impact": "Came back less stuck"},
+            "15": {"done": "Backend endpoints for folder delete", "impact": "Delete path works end to end"},
+            "18": {"done": "Manual testing in local Supabase", "impact": "Caught a RLS miss before merge"},
+            "21": {"done": "Notes for tomorrow", "impact": "Didn't lose the next step"},
         },
     },
     # Test user: diary entry
@@ -73,9 +74,9 @@ SEED_DIARY_ENTRIES = [
         "email": "test@example.com",
         "date": "2026-07-21",
         "day_log": {
-            "9": "QA pass on diary page",
-            "11": "QA pass on day log page",
-            "15": "Regression check on chat panel",
+            "9": {"done": "QA pass on diary page", "impact": "Confirmed save/load for diary fields"},
+            "11": {"done": "QA pass on day log page", "impact": "Hour slots load and persist"},
+            "15": {"done": "Regression check on chat panel", "impact": "No break in the streaming path"},
         },
     },
 ]

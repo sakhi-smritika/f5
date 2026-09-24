@@ -114,8 +114,9 @@ def get_day_log(date: str) -> dict:
         date: The day to fetch, in ISO ``YYYY-MM-DD`` format.
 
     Returns:
-        A dict with the ``day_log`` object (hourly slots keyed ``"0"``..``"23"``)
-        for that date, or ``found`` ``False`` if there is no entry.
+        A dict with the ``day_log`` object (hourly slots keyed ``"0"``..``"23"``,
+        each ``{"done": "...", "impact": "..."}``) for that date, or ``found``
+        ``False`` if there is no entry.
     """
     user_id = require_user_id()
     result = (
@@ -188,17 +189,25 @@ def upsert_diary_entry(
     return {"ok": True, "entry": rows[0] if rows else payload}
 
 
-def set_day_log_hour(date: str, hour: int, text: str) -> dict:
-    """Set the text for a single hourly slot in the user's day log.
+def set_day_log_hour(
+    date: str,
+    hour: int,
+    text: str,
+    impact: str | None = None,
+) -> dict:
+    """Set one hourly slot in the user's day log.
 
     Merges into any existing day log for that date without disturbing the other
     hours. Creates the diary entry for the date if it does not exist yet.
+    Each hour is ``{"done": "...", "impact": "..."}``.
 
     Args:
         date: The day to write, in ISO ``YYYY-MM-DD`` format. Required.
         hour: The hour slot to set, an integer from 0 to 23.
-        text: What the user did during that hour. Pass an empty string to clear
-            the slot.
+        text: What was done during that hour. Pass an empty string to clear
+            ``done``.
+        impact: Optional. What the impact of that hour was. Omit to leave the
+            existing impact unchanged; pass an empty string to clear it.
 
     Returns:
         ``{"ok": True, "date": ..., "hour": ..., "day_log": {...}}`` with the
@@ -226,7 +235,7 @@ def set_day_log_hour(date: str, hour: int, text: str) -> dict:
     )
     rows = existing.data or []
     day_log = dict(rows[0].get("day_log") or {}) if rows else {}
-    day_log[str(hour_int)] = text
+    day_log[str(hour_int)] = _hour_slot(day_log.get(str(hour_int)), text, impact)
 
     payload = {"user_id": user_id, "date": clean_date, "day_log": day_log}
     try:
@@ -235,3 +244,21 @@ def set_day_log_hour(date: str, hour: int, text: str) -> dict:
         return {"ok": False, "error": f"Failed to update day log: {exc}"}
 
     return {"ok": True, "date": clean_date, "hour": hour_int, "day_log": day_log}
+
+
+def _hour_slot(existing, done: str, impact: str | None) -> dict:
+    """Normalize a day-log hour to ``{done, impact}``, preserving impact unless set."""
+    if isinstance(existing, dict):
+        current_done = existing.get("done") or ""
+        current_impact = existing.get("impact") or ""
+    elif isinstance(existing, str):
+        current_done = existing
+        current_impact = ""
+    else:
+        current_done = ""
+        current_impact = ""
+
+    return {
+        "done": done if done is not None else current_done,
+        "impact": current_impact if impact is None else impact,
+    }

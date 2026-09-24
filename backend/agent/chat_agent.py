@@ -39,7 +39,7 @@ INSTRUCTION = (
     "DIARY. Read: fetch a diary entry for a date (get_diary_entry), list recent "
     "entries (get_recent_diary_entries), search by keyword (search_diary), read "
     "the hourly day log (get_day_log). Write: create or update a day's entry "
-    "(upsert_diary_entry) and set a single hour of the day log (set_day_log_hour).\n"
+    "(upsert_diary_entry) and set a day's hour (done + impact) with set_day_log_hour.\n"
     "GOALS. Read: list all goals (list_my_goals), fetch one by id (get_goal), list "
     "sub-goals under a parent (list_child_goals), search by keyword (search_goals). "
     "Write: create a goal or sub-goal (create_goal) and update a goal's name, "

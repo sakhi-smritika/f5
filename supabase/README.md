@@ -28,7 +28,7 @@ One row per user per date. Stores both the free-text diary and the hourly day lo
 - `how_was_the_day text` — the Diary page's "How was the day?" reflection
 - `major_events text` — the Diary page's "Major events happened today"
 - `general_content text` — the Diary page's free text
-- `day_log jsonb` (default `{}`) — Day Log page's 24 hourly slots, keyed `"0"`..`"23"`
+- `day_log jsonb` (default `{}`) — Day Log hourly slots, keyed `"0"`..`"23"`. Each hour is `{"done": text, "impact": text}`
 - `created_at`, `updated_at` (auto-updated via `set_diary_updated_at` trigger)
 - RLS: users can select/insert/update/delete only their own rows.
 
